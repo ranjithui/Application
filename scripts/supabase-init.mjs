@@ -94,7 +94,12 @@ await client.end();
 
 // --- 3. bucket --------------------------------------------------------------
 const head = await api(`${SUPABASE_URL}/storage/v1/bucket/${BUCKET}`, { headers });
-if (head.status === 404) {
+const headBody = await head.text();
+// Supabase answers a missing bucket with HTTP 400 and a body of
+// {"statusCode":"404", "code":"NoSuchBucket"} — not an HTTP 404. Checking the
+// status alone silently skips creation and then fails on the first upload.
+const missing = head.status === 404 || /NoSuchBucket|Bucket not found/i.test(headBody);
+if (missing) {
   const res = await api(`${SUPABASE_URL}/storage/v1/bucket`, {
     method: 'POST',
     headers: { ...headers, 'content-type': 'application/json' },
@@ -111,12 +116,12 @@ if (head.status === 404) {
   if (!res.ok) fail(`Could not create bucket: ${res.status} ${await res.text()}`);
   ok(`created private bucket "${BUCKET}"`);
 } else if (head.ok) {
-  const b = await head.json();
+  const b = JSON.parse(headBody);
   ok(`bucket "${BUCKET}" exists`);
   if (b.public) fail(`Bucket "${BUCKET}" is PUBLIC. Student documents would be readable by anyone with the URL. Set it to private in the Supabase dashboard.`);
   ok('bucket is private');
 } else {
-  fail(`Could not read bucket: ${head.status} ${await head.text()}`);
+  fail(`Could not read bucket: ${head.status} ${headBody}`);
 }
 
 // --- 4. storage round trip --------------------------------------------------
