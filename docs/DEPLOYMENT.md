@@ -86,32 +86,62 @@ postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/p
 Session mode (port 5432) suits this app: one long-lived Node process holding a small pool.
 Transaction mode (port 6543) also works, but keep `DATABASE_POOL_MAX` low if you use it.
 
-### 2. Create the storage bucket
+### 2. Copy the API credentials
 
-**Storage → New bucket**, named `documents`, and leave **Public** off. The API streams every
-download itself through `/api/documents/:id/download` after checking permissions, so the
-bucket must stay private — a public bucket would expose student records to anyone holding a
-URL. No bucket policies are needed: the backend uses the service role key.
+From **Project Settings → API**, take the project URL (`https://<ref>.supabase.co`) and the
+`service_role` key. That key bypasses row-level security, so it belongs on the server only —
+never in the SPA, and never committed.
 
-### 3. Load the schema and demo data
+The `documents` storage bucket is created for you in step 3. It must stay **private**: the
+API streams every download itself through `/api/documents/:id/download` after checking
+permissions, so a public bucket would expose student records to anyone holding a URL. No
+bucket policies are needed — the backend authenticates with the service role key.
 
-Run this from your machine, not from Render. The seed refuses to run when
-`NODE_ENV=production`, by design — it writes fictional sample data.
+### 3. Point .env at Supabase and check it
+
+Everything in this step runs from your machine, not from Render. Put the Supabase values in
+`.env` — they stay in that file and are never passed on a command line:
+
+```ini
+DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+DATABASE_SSL=no-verify
+NODE_ENV=development
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service_role key>
+STORAGE_DRIVER=supabase
+```
+
+Then:
 
 ```bash
-# In .env, temporarily point DATABASE_URL at the Supabase session pooler URI and set:
-#   DATABASE_SSL=no-verify
-#   NODE_ENV=development
+npm run supabase:init
+```
+
+That checks the connection string is the pooler and not the IPv6-only direct host, connects
+to Postgres and reports what is already there, creates the private bucket if it is missing,
+and round-trips a test object through it. It is safe to re-run. Fix anything it reports
+before going near Render — every one of these failures is much harder to diagnose from a
+build log.
+
+### 4. Load the schema and demo data
+
+The seed refuses to run when `NODE_ENV=production`, by design — it writes fictional sample
+data — and only runs against an empty database.
+
+```bash
 npm run db:migrate
 npm run db:seed
 ```
 
-Then put your local `DATABASE_URL` back. The demo accounts in `LOGINS.txt` now exist on
-Supabase with the password from `SEED_DEMO_PASSWORD`.
+The demo accounts in `LOGINS.txt` now exist on Supabase with the password from
+`SEED_DEMO_PASSWORD`.
 
 For a real deployment, run only `db:migrate` and create the first Super Admin directly.
 
-### 4. Deploy on Render
+Then put your local `DATABASE_URL` and `STORAGE_DRIVER=local` back, so local development
+keeps using the local cluster.
+
+### 5. Deploy on Render
 
 Push the repo to GitHub, then **New → Blueprint** and point Render at it. `render.yaml` is
 picked up automatically. Render generates `JWT_SECRET` and `JWT_REFRESH_SECRET`; you supply

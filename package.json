@@ -22,6 +22,7 @@
     "db:local:stop": "node scripts/local-db.mjs stop",
     "test:db": "npm run test:db --workspace backend",
     "db:local:init": "node scripts/local-db.mjs init",
+    "supabase:init": "node --env-file-if-exists=.env scripts/supabase-init.mjs",
     "test:screens": "npm run test:screens --workspace frontend"
   },
   "engines": {
