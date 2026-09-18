@@ -30,4 +30,6 @@ RUN addgroup -S app && adduser -S app -G app && mkdir -p /data/uploads && chown 
 USER app
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:4000/api/health || exit 1
-CMD ["node", "backend/dist/src/server.js"]
+# Runs pending migrations, then the server, in one process so that node is PID 1
+# and receives SIGTERM for a graceful shutdown.
+CMD ["node", "backend/dist/scripts/start.js"]

@@ -31,7 +31,8 @@ services:
       - uploads:/data/uploads
     ports:
       - "4000:4000"
-    command: ["sh", "-c", "node backend/dist/scripts/migrate.js && node backend/dist/src/server.js"]
+    # Migrations + server, via the image's default entrypoint.
+    command: ["node", "backend/dist/scripts/start.js"]
 
 volumes:
   pgdata:

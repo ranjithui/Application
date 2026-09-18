@@ -14,7 +14,7 @@ from `WEB_DIST_DIR` on the same origin (so no CORS setup is needed for the web a
 docker compose up -d --build
 ```
 
-3. The container runs pending migrations on start (`backend/dist/scripts/migrate.js`), then the server on port 4000.
+3. The container entrypoint (`backend/dist/scripts/start.js`) applies pending migrations, then starts the server on port 4000 in the same process.
 4. Put a TLS-terminating reverse proxy (nginx, Caddy, a cloud load balancer) in front, forwarding to `app:4000`.
    `COOKIE_SECURE=true` is set, so the site must be served over HTTPS.
 5. Create the first administrator (production never loads sample data):
@@ -153,8 +153,15 @@ the three values marked `sync: false`:
 | `SUPABASE_URL` | `https://<ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` |
 
-Each deploy runs `backend/dist/scripts/migrate.js` before the server starts. That is
-idempotent — `migrate-lib` skips any file already recorded in `schema_migrations`.
+The blueprint deliberately sets **no `dockerCommand`** — the image's own `CMD` runs
+`backend/dist/scripts/start.js`, which applies pending migrations and then starts the server
+in the same process. That is idempotent: `migrate-lib` skips any file already recorded in
+`schema_migrations`.
+
+Do not "fix" this by adding `dockerCommand: sh -c "node …migrate.js && node …server.js"`.
+Render does not hand the `&&` chain to the shell intact, so the whole string comes back as
+`sh: node …: not found` and the deploy exits 127. Keeping node as PID 1 also means it
+actually receives SIGTERM, so the graceful shutdown in `server.ts` runs on redeploys.
 
 Render marks the service live once `/api/health` returns 200, which it only does after a
 successful `SELECT 1`. A service stuck "in progress" almost always means `DATABASE_URL` is

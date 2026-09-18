@@ -25,9 +25,10 @@ services:
     # anyone depends on it — see "Free tier" in docs/DEPLOYMENT.md.
     plan: free
     healthCheckPath: /api/health
-    # Apply any pending migrations before the API accepts traffic. Idempotent:
-    # migrate-lib skips files already recorded in schema_migrations.
-    dockerCommand: sh -c "node backend/dist/scripts/migrate.js && node backend/dist/src/server.js"
+    # No dockerCommand on purpose. The image's CMD already runs migrations and
+    # then the server (backend/dist/scripts/start.js). Passing a `sh -c "a && b"`
+    # string here fails: Render does not hand the && chain to the shell intact,
+    # and the whole string comes back as `sh: ...: not found` (exit 127).
     envVars:
       - key: NODE_ENV
         value: production
