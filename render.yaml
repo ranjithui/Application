@@ -20,7 +20,10 @@ services:
     dockerfilePath: ./Dockerfile
     # Singapore is the closest Render region to India.
     region: singapore
-    plan: starter
+    # Free instance: 512 MB / 0.1 CPU, sleeps after 15 minutes idle and takes
+    # ~30-60s to wake. Fine for testing and demos. Move to `starter` before
+    # anyone depends on it — see "Free tier" in docs/DEPLOYMENT.md.
+    plan: free
     healthCheckPath: /api/health
     # Apply any pending migrations before the API accepts traffic. Idempotent:
     # migrate-lib skips files already recorded in schema_migrations.
@@ -41,8 +44,10 @@ services:
       # Supabase's CA bundle into DATABASE_CA_CERT.
       - key: DATABASE_SSL
         value: no-verify
+      # Kept small: one free 512 MB instance, and Supabase's free tier caps
+      # pooler client connections. Raise it alongside the instance size.
       - key: DATABASE_POOL_MAX
-        value: 10
+        value: 5
 
       # --- Auth ---------------------------------------------------------------
       # Generated once by Render and then held steady. Changing either value
@@ -54,12 +59,12 @@ services:
       - key: COOKIE_SECURE
         value: true
 
-      # Single origin, so this only matters for non-browser clients.
+      # The SPA is served from this same origin, so CORS is never consulted for
+      # it; this only matters for non-browser or mobile clients. Render assigns
+      # https://<service name>.onrender.com, but appends a suffix if the name is
+      # already taken — correct this after the first deploy if so.
       - key: CORS_ORIGINS
-        fromService:
-          type: web
-          name: holy-sai
-          property: hostport
+        value: https://holy-sai.onrender.com
 
       # --- Document storage (Supabase Storage) --------------------------------
       - key: STORAGE_DRIVER

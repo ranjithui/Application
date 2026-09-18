@@ -136,11 +136,34 @@ pointing at the direct Supabase host rather than the pooler.
   certificate chain. To verify properly, download Supabase's CA bundle (Project Settings →
   Database → SSL configuration), set `DATABASE_SSL=true`, and paste the PEM into
   `DATABASE_CA_CERT`.
-- **Free instances sleep** after 15 minutes idle and take ~30s to wake. The blueprint uses
-  `starter` for that reason; drop it to `free` for a pure demo if the delay is acceptable.
-- **Supabase free projects pause** after a week of inactivity and need a manual resume.
 - **Region:** the blueprint uses Render's `singapore`, the closest to India. Create the
   Supabase project in a matching region — a mismatch adds ~200ms to every query.
+
+### Free tier
+
+The blueprint ships with `plan: free`, which is enough to test the whole stack end to end.
+What to expect:
+
+- **The service sleeps after 15 minutes without an inbound request**, and takes ~30–60s to
+  wake. The first person to hit the site after a quiet spell will watch a blank tab. Note
+  that the notification dispatcher in `server.ts` does *not* keep it awake — only incoming
+  requests count.
+- **Waking restarts the container**, so migrations re-run on every cold start. That is
+  harmless (already-applied files are skipped) but adds a second or two.
+- **If the Supabase project is paused, the service will not start at all.** The start command
+  runs migrations first, those fail against a paused database, and the container exits.
+  Resume Supabase, then redeploy. This is the most likely cause of a free deploy that worked
+  yesterday and fails today.
+- **Supabase free projects pause after ~1 week of inactivity** and need a manual resume from
+  the dashboard.
+- **512 MB RAM, 0.1 CPU.** Fine for demo traffic; `DATABASE_POOL_MAX` is set to 5 to match.
+- **No persistent disk** — which is exactly why `STORAGE_DRIVER=supabase` matters here. On
+  free, `local` storage would lose every uploaded document on each sleep/wake cycle, not just
+  on deploys.
+
+Going to `starter` removes the sleeping and raises the memory; nothing else in the blueprint
+needs to change. Note this uses **Supabase** for Postgres, not Render's own free Postgres —
+that one expires after 30 days, which is a trap worth avoiding.
 
 ## Production checklist
 
