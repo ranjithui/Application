@@ -1,0 +1,134 @@
+/* ==========================================================================
+   HOLY SAI SMART SCHOOL 360 — DESIGN TOKENS
+   Single source of truth for colour, type, space, radius, elevation, motion.
+   ========================================================================== */
+
+:root {
+  /* ---- Brand Guidelines (Holy Sai International School) ---- */
+  --magenta:         #990033;   /* Holy Sai Magenta (Primary) */
+  --magenta-deep:    #3E0013;   /* Deep Wine for sidebar / dark shell */
+  --magenta-dark:    #5C001D;
+  --magenta-light:   #B30042;   /* Deep Magenta (Vibrant accent & hover) */
+  --magenta-tint:    #FFF0F4;   /* Soft pink/rose tint */
+  --magenta-line:    #F8C8D4;
+
+  --gold:            #FEDB6E;   /* Warm Yellow / Gold */
+  --gold-hover:      #EDCA59;
+  --gold-deep:       #B87A04;   /* Accessible text gold */
+  --gold-tint:       #FFF9E6;
+  --gold-line:       #F7E5A8;
+
+  --charcoal:        #171717;   /* Charcoal Black */
+  --charcoal-light:  #2C2C2C;
+  --charcoal-muted:  #5C5C5C;
+  --charcoal-faint:  #858585;
+
+  /* ---- Backward-compatible Aliases for System Components ---- */
+  --navy:            var(--magenta);
+  --navy-light:      var(--magenta-light);
+  --navy-deep:       var(--magenta-deep);
+  --amber:           #C27E0A;
+  --amber-hover:     #A56A04;
+  --teal:            #0D7B66;
+  --teal-hover:      #096150;
+
+  /* ---- Surfaces ------------------------------------------------------- */
+  --bg:              #F8F5F2;   /* Warm luxury ground */
+  --bg-sunken:       #EFE8E1;
+  --surface:         #FFFFFF;
+  --surface-alt:     #FCFAF8;
+  --surface-navy:    #3E0013;   /* Royal Deep Wine for sidebar */
+  --surface-brand:   #990033;
+  --overlay:         rgba(23, 10, 15, .65);
+
+  /* ---- Text ----------------------------------------------------------- */
+  --text:            #2C2C2C;   /* Charcoal body text */
+  --text-strong:     #171717;   /* Charcoal Black headings */
+  --text-muted:      #666666;   /* Labels, meta */
+  --text-faint:      #8E8E8E;   /* Decorative / disabled */
+  --text-invert:     #FFFFFF;
+  --text-on-navy:    #FCE4EC;   /* Rose-white on deep wine */
+
+  /* ---- Lines ---------------------------------------------------------- */
+  --border:          #E5DDD6;
+  --border-strong:   #D1C4BA;
+  --border-soft:     #F2EBE5;
+  --border-navy:     rgba(255, 255, 255, .14);
+  --border-gold:     rgba(254, 219, 110, .45);
+
+  /* ---- Status (semantic) ---------------------------------------------- */
+  --critical:        #C2273B;  --critical-tint: #FDF0F2;  --critical-line: #F9CAD2;
+  --warning:         #C27E0A;  --warning-tint:  #FEF7EA;  --warning-line:  #F7DDB2;
+  --caution:         #9E7B06;  --caution-tint:  #FAF6E2;  --caution-line:  #ECE1B0;
+  --info:            #990033;  --info-tint:     #FFF0F4;  --info-line:     #F8C8D4;
+  --success:         #158055;  --success-tint:  #E8F7F0;  --success-line:  #B9E6D1;
+  --neutral:         #666666;  --neutral-tint:  #F5EFEB;  --neutral-line:  #DDD3CA;
+
+  /* ---- Data-viz series (accessible, brand-derived) -------------------- */
+  --viz-1: #990033;
+  --viz-2: #B30042;
+  --viz-3: #D48E0B;
+  --viz-4: #158055;
+  --viz-5: #742588;
+  --viz-6: #C2273B;
+  --viz-7: #E05780;
+  --viz-8: #383838;
+  --viz-grid: #EFE8E1;
+  --viz-axis: #C2B6AB;
+
+  /* ---- Typography (Brand Guidelines: Cinzel + Montserrat) ------------- */
+  --font-display: "Cinzel", "Playfair Display", "Times New Roman", serif;
+  --font-ui: "Montserrat", "Noto Sans Devanagari", "Noto Sans Tamil", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-script: "Caveat", cursive;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  --fs-display: 32px;
+  --fs-h1:      24px;
+  --fs-h2:      19px;
+  --fs-h3:      16px;
+  --fs-body:    14px;
+  --fs-sm:      13px;
+  --fs-xs:      12px;
+  --fs-micro:   11px;
+
+  --lh-tight: 1.2;
+  --lh-snug:  1.35;
+  --lh-body:  1.55;
+
+  --track-caps: .08em;
+
+  /* ---- Space (4pt grid) ----------------------------------------------- */
+  --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+  --s-5: 20px;  --s-6: 24px;  --s-7: 32px;  --s-8: 40px;
+  --s-9: 48px;  --s-10: 64px;
+
+  /* ---- Radius --------------------------------------------------------- */
+  --r-sm: 6px;  --r-md: 10px;  --r-lg: 14px;  --r-xl: 20px;  --r-pill: 999px;
+
+  /* ---- Elevation ------------------------------------------------------ */
+  --sh-1: 0 1px 3px rgba(62,0,19,.06);
+  --sh-2: 0 2px 6px rgba(62,0,19,.07), 0 8px 20px -8px rgba(62,0,19,.15);
+  --sh-3: 0 4px 12px rgba(62,0,19,.08), 0 20px 42px -12px rgba(62,0,19,.22);
+  --sh-4: 0 32px 75px -20px rgba(45,0,15,.45);
+  --sh-gold: 0 4px 14px rgba(254,219,110,.35);
+  --sh-focus: 0 0 0 3px rgba(179,0,66,.32);
+
+  /* ---- Layout --------------------------------------------------------- */
+  --sidebar-w: 276px;
+  --sidebar-w-collapsed: 72px;
+  --topbar-h: 62px;
+  --content-max: 1560px;
+
+  /* ---- Motion --------------------------------------------------------- */
+  --t-fast: 140ms cubic-bezier(.4,0,.2,1);
+  --t-base: 220ms cubic-bezier(.4,0,.2,1);
+  --t-slow: 340ms cubic-bezier(.22,1,.36,1);
+
+  /* ---- Z-index scale (10 / 20 / 30 / 50) ------------------------------ */
+  --z-base: 1;
+  --z-sticky: 10;
+  --z-nav: 20;
+  --z-overlay: 30;
+  --z-modal: 50;
+  --z-toast: 60;
+}

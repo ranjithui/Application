@@ -1,0 +1,27 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "holysai-wireframe",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5573"
+      ],
+      "port": 5573
+    },
+    {
+      "name": "holysai-proposal-wireframe",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5574",
+        "--directory",
+        "C:\\Users\\USER\\OneDrive\\Desktop\\holysai"
+      ],
+      "port": 5574
+    }
+  ]
+}

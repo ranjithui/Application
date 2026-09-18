@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+.pgdata
+.env
+uploads
+**/dist
+wireframe
+.git
+LOGINS.txt

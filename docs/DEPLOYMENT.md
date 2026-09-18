@@ -1,0 +1,162 @@
+# Deployment
+
+## Option A — Docker (single image + PostgreSQL)
+
+The root `Dockerfile` builds the API and the web app into one image; the API serves the SPA
+from `WEB_DIST_DIR` on the same origin (so no CORS setup is needed for the web app).
+
+1. Create a `.env` next to `docker-compose.yml` with `POSTGRES_PASSWORD`, `JWT_SECRET`,
+   `JWT_REFRESH_SECRET` (long random values) and `CORS_ORIGINS` (your public URL, used by
+   any other browser origin).
+2. Build and start:
+
+```bash
+docker compose up -d --build
+```
+
+3. The container runs pending migrations on start (`backend/dist/scripts/migrate.js`), then the server on port 4000.
+4. Put a TLS-terminating reverse proxy (nginx, Caddy, a cloud load balancer) in front, forwarding to `app:4000`.
+   `COOKIE_SECURE=true` is set, so the site must be served over HTTPS.
+5. Create the first administrator (production never loads sample data):
+
+```bash
+docker compose exec db psql -U holysai -d holysai
+```
+
+   and insert a Super Admin user with a bcrypt hash generated offline, or run the seed once
+   in a staging database and copy only the reference tables (roles, permissions,
+   role_permissions, campuses, academic_years, classes, subjects, system_settings).
+
+Persistent volumes: `pgdata` (database) and `uploads` (documents). Back both up.
+
+## Option B — separate hosts
+
+| Part | How |
+|---|---|
+| Database | Managed PostgreSQL 15+ (set `DATABASE_SSL=true` if required). Run `npm run db:migrate`. |
+| API | `npm ci && npm run build --workspace backend`, then `NODE_ENV=production node backend/dist/src/server.js` under a process manager (systemd, PM2) behind a reverse proxy. |
+| Web | `npm run build --workspace frontend` and serve `frontend/dist` from any static host / CDN with SPA fallback to `index.html`. Set `VITE_API_BASE_URL=https://api.example.com/api` at build time and add the web origin to `CORS_ORIGINS`. For cross-site cookies, host the web app and API on the same site (e.g. `app.` and `api.` subdomains) and set `COOKIE_DOMAIN`. |
+
+nginx sketch for Option B (same host):
+
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name school.example.com;
+  root /srv/holysai/frontend/dist;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:4000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 12m;
+  }
+  location / {
+    try_files $uri /index.html;
+  }
+}
+```
+
+## Option C — Render + Supabase
+
+`render.yaml` in the repo root deploys the whole app as **one** Render web service: the
+Docker image serves the API and the SPA on a single origin, so the refresh-token cookie
+stays `SameSite=Strict` and no CORS configuration is needed. Postgres and document storage
+come from Supabase.
+
+Two constraints drive this setup:
+
+- **Use Supabase's connection pooler, not the direct host.** `db.<ref>.supabase.co` resolves
+  to IPv6 only, and Render has no IPv6 outbound — connections there hang and then time out.
+  The Supavisor pooler is dual-stack.
+- **Render's filesystem is ephemeral.** Anything written locally is lost on every deploy and
+  every restart, so uploaded documents must go to Supabase Storage (`STORAGE_DRIVER=supabase`).
+
+### 1. Create the Supabase project
+
+Note the database password when the project is created — it is shown only once.
+
+From **Project Settings → Database → Connection string → Session pooler**, copy the URI:
+
+```
+postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+```
+
+Session mode (port 5432) suits this app: one long-lived Node process holding a small pool.
+Transaction mode (port 6543) also works, but keep `DATABASE_POOL_MAX` low if you use it.
+
+### 2. Create the storage bucket
+
+**Storage → New bucket**, named `documents`, and leave **Public** off. The API streams every
+download itself through `/api/documents/:id/download` after checking permissions, so the
+bucket must stay private — a public bucket would expose student records to anyone holding a
+URL. No bucket policies are needed: the backend uses the service role key.
+
+### 3. Load the schema and demo data
+
+Run this from your machine, not from Render. The seed refuses to run when
+`NODE_ENV=production`, by design — it writes fictional sample data.
+
+```bash
+# In .env, temporarily point DATABASE_URL at the Supabase session pooler URI and set:
+#   DATABASE_SSL=no-verify
+#   NODE_ENV=development
+npm run db:migrate
+npm run db:seed
+```
+
+Then put your local `DATABASE_URL` back. The demo accounts in `LOGINS.txt` now exist on
+Supabase with the password from `SEED_DEMO_PASSWORD`.
+
+For a real deployment, run only `db:migrate` and create the first Super Admin directly.
+
+### 4. Deploy on Render
+
+Push the repo to GitHub, then **New → Blueprint** and point Render at it. `render.yaml` is
+picked up automatically. Render generates `JWT_SECRET` and `JWT_REFRESH_SECRET`; you supply
+the three values marked `sync: false`:
+
+| Variable | Where it comes from |
+|---|---|
+| `DATABASE_URL` | The session pooler URI from step 1 |
+| `SUPABASE_URL` | `https://<ref>.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` |
+
+Each deploy runs `backend/dist/scripts/migrate.js` before the server starts. That is
+idempotent — `migrate-lib` skips any file already recorded in `schema_migrations`.
+
+Render marks the service live once `/api/health` returns 200, which it only does after a
+successful `SELECT 1`. A service stuck "in progress" almost always means `DATABASE_URL` is
+pointing at the direct Supabase host rather than the pooler.
+
+### Notes
+
+- **`DATABASE_SSL=no-verify`** encrypts the connection but does not verify Supabase's
+  certificate chain. To verify properly, download Supabase's CA bundle (Project Settings →
+  Database → SSL configuration), set `DATABASE_SSL=true`, and paste the PEM into
+  `DATABASE_CA_CERT`.
+- **Free instances sleep** after 15 minutes idle and take ~30s to wake. The blueprint uses
+  `starter` for that reason; drop it to `free` for a pure demo if the delay is acceptable.
+- **Supabase free projects pause** after a week of inactivity and need a manual resume.
+- **Region:** the blueprint uses Render's `singapore`, the closest to India. Create the
+  Supabase project in a matching region — a mismatch adds ~200ms to every query.
+
+## Production checklist
+
+- [ ] `NODE_ENV=production` (enables `trust proxy`, hides error details, blocks reset/seed)
+- [ ] Strong `JWT_SECRET` and `JWT_REFRESH_SECRET` (different values, ≥ 48 random bytes)
+- [ ] HTTPS everywhere; `COOKIE_SECURE=true`; correct `CORS_ORIGINS`
+- [ ] Database backups and point-in-time recovery; restore tested
+- [ ] Documents on persistent, backed-up storage: `STORAGE_DRIVER=supabase` (private bucket), or `local` with `UPLOAD_DIR` on a mounted disk — never `local` on an ephemeral filesystem
+- [ ] Log shipping from stdout (pino JSON) to your log platform
+- [ ] Notification providers configured (`WHATSAPP_*`, `SMS_*`, `SMTP_URL`, `PUSH_FCM_SERVER_KEY`) and adapters implemented in `notification.service.ts`
+- [ ] Payment gateway integrated in place of the simulated charge in the finance service
+- [ ] Sample GPS rows removed; real devices issued; guardian consent recorded
+- [ ] Retention policy for `student_locations` and `audit_logs`
+- [ ] Rate limits tuned (`RATE_LIMIT_*`) for your traffic; if running several API instances, use a shared rate-limit store
+
+## Environment variables
+
+See `.env.example` for the full list with comments. Required: `DATABASE_URL`,
+`JWT_SECRET`, `JWT_REFRESH_SECRET`.

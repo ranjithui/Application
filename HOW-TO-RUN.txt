@@ -1,0 +1,236 @@
+HOLY SAI SMART SCHOOL 360 - HOW TO RUN
+======================================
+
+Project folder:  C:\Users\USER\ui ux\holy sai\Application
+Needs:           Node.js 20 or newer, PostgreSQL (already installed on this PC)
+
+All commands below are run from the project folder, in PowerShell or Git Bash.
+
+What you get:
+  - Website (React)            http://localhost:5173
+  - Common REST API            http://localhost:4000/api
+  - API documentation          http://localhost:4000/api/docs
+  - PostgreSQL database        localhost:5544, database "holysai"
+
+
+----------------------------------------------------------------------
+QUICK START (this PC, everything already set up)
+----------------------------------------------------------------------
+
+  1. Start the database (PowerShell):
+       & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D .\.pgdata -o "-p 5544" -l .\.pgdata\server.log start
+
+  2. Start the API and the website:
+       npm run dev
+
+  3. Open http://localhost:5173 and sign in (see section C).
+
+  To stop: Ctrl+C in the terminal, then optionally
+       & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D .\.pgdata stop
+
+
+----------------------------------------------------------------------
+A. FIRST TIME ONLY (or on a new machine)
+----------------------------------------------------------------------
+
+1) Install packages
+
+   npm install
+
+2) Settings file (.env)
+
+   The file ".env" in the project folder holds the settings. On this PC it
+   already exists. On a NEW machine copy .env.example to .env and fill in:
+
+     DATABASE_URL        database connection
+                         (this PC: postgres://postgres:...@localhost:5544/holysai)
+     JWT_SECRET          long random value
+     JWT_REFRESH_SECRET  a different long random value
+     SEED_DEMO_PASSWORD  the password given to every demo account
+
+   Generate a random secret with:
+     node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+
+   Request limits (per 15 minutes, per computer address):
+     RATE_LIMIT_MAX        all API requests  (this PC: 50000 for testing;
+                                              use 3000 for a real deployment)
+     AUTH_RATE_LIMIT_MAX   sign-in attempts  (this PC: 200; real: 20)
+
+3) Database
+
+   This PC uses a private PostgreSQL cluster in the ".pgdata" folder on
+   port 5544. Your installed PostgreSQL 17/18 services are not touched.
+
+   Start it (PowerShell):
+     & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D .\.pgdata -o "-p 5544" -l .\.pgdata\server.log start
+
+   On a NEW machine, either:
+     - create a private cluster (PostgreSQL binaries on PATH, or set PG_BIN):
+         set LOCAL_PG_PASSWORD=choose-a-password   (PowerShell: $env:LOCAL_PG_PASSWORD="...")
+         npm run db:local:init
+       then later: npm run db:local:start / npm run db:local:stop
+     - or point DATABASE_URL at any PostgreSQL 15+ database you already have.
+
+4) Create the tables and load the sample data
+
+   npm run db:reset
+
+   This DROPS and recreates everything in the database named in
+   DATABASE_URL, runs all migrations, then loads fictional sample data:
+   68 students, staff, parents, fees, payroll, admissions, academics,
+   transport and sample GPS coordinates. Dates are generated relative to
+   today, so the dashboards always look current. Re-run it any time you
+   want a fresh demo (for example the next day).
+
+
+----------------------------------------------------------------------
+B. EVERY TIME
+----------------------------------------------------------------------
+
+1) Make sure the database is running.
+   Check (PowerShell):
+     & "C:\Program Files\PostgreSQL\18\bin\pg_ctl.exe" -D .\.pgdata status
+
+2) Start the API and the website together:
+
+     npm run dev
+
+   Or in two separate terminals:
+     npm run dev:api        (API on port 4000, restarts when code changes)
+     npm run dev:web        (website on port 5173)
+
+3) Open http://localhost:5173 in the browser.
+
+4) Stop: press Ctrl+C in the terminal(s).
+
+
+----------------------------------------------------------------------
+C. SIGNING IN (demo accounts - sample data only)
+----------------------------------------------------------------------
+
+Password for every demo account = the SEED_DEMO_PASSWORD value in .env
+
+  Principal / Management   meera.krishnan.demo@holysai.edu
+  Teacher (Grade 5A)       priya.raghavan.demo@holysai.edu
+  Parent (Aditya & Surya)  ranjith.kumar.demo@parents.holysai.edu
+  Office                   kavitha.s.demo@holysai.edu
+  Non-teaching staff       murugan.p.demo@holysai.edu
+  Super Admin              admin.demo@holysai.edu
+  School Admin             anand.rao.demo@holysai.edu
+  Management (trustee)     srinivasan.demo@holysai.edu
+  HR                       lakshmi.n.demo@holysai.edu
+  Finance                  rajesh.iyer.demo@holysai.edu
+  Student                  aditya.kumar.demo@students.holysai.edu
+  Second parent            sudha.raman.demo@parents.holysai.edu
+  Second teacher           ganesh.venkat.demo@holysai.edu
+
+On the sign-in page click a role tile to fill in the email (or
+"More accounts" for the full list), then type the password.
+
+5 wrong passwords lock an account for 15 minutes. A Super Admin can
+unlock it at Administration -> Users & Roles, or just wait.
+
+Light / dark theme: the sun/moon button in the top bar. The choice is
+remembered in this browser; on a first visit the device setting is used.
+
+Things to try:
+  Tracking (staff)   Principal -> sidebar "Student Tracking"
+                     (map of all students, filters, list, history)
+  Student 360        Principal -> Students -> Aditya Kumar
+                     -> "Student Tracking" tab
+  Tracking (parent)  Parent -> Parent 360 -> "Track" tab
+                     (own children only, last 7 days of history)
+  Pay fees           Parent -> Parent 360 -> "Fees" -> Pay Now
+                     (payment is simulated - no real gateway)
+  Attendance         Teacher -> Attendance -> Grade 5A (not yet marked today)
+  Admissions         Office -> Leads -> open a lead -> move it to Enrolled
+  Payroll            HR prepares the run, Principal approves it
+
+  Example student from the brief: Aarav Kumar (HS-2026-1091),
+  location 11.0168, 76.9558 (Coimbatore).
+
+
+----------------------------------------------------------------------
+D. USEFUL COMMANDS
+----------------------------------------------------------------------
+
+  npm run dev              API + website together (development)
+  npm run dev:api          API only
+  npm run dev:web          website only
+  npm run db:migrate       apply new database migrations only (keeps data)
+  npm run db:seed          load sample data into an EMPTY database
+  npm run db:reset         wipe + recreate + reload sample data
+  npm run test:db          prepare the separate test database (holysai_test)
+  npm test                 run the API tests (run test:db first)
+  npm run test:screens     open every screen as 8 roles and check for errors
+                           (the API must be running on port 4000;
+                            takes about 5-10 minutes)
+  npm run typecheck        check TypeScript in API and website
+  npm run build            production build of API and website
+  npm start                run the built API
+
+  Design preview (development only, no sign-in, sample values):
+    http://localhost:5173/__ui
+
+  Regenerate the database documentation (docs\DATABASE.md):
+    npm run docs:schema --workspace backend
+
+
+----------------------------------------------------------------------
+E. PRODUCTION-STYLE RUN (optional)
+----------------------------------------------------------------------
+
+  Build once:
+    npm run build
+
+  Run the API and let it serve the built website on one address
+  (PowerShell):
+    $env:NODE_ENV="production"; $env:WEB_DIST_DIR="../frontend/dist"; npm start
+
+  Then open http://localhost:4000
+  Note: production mode refuses db:reset and sample data, requires HTTPS
+  cookies if COOKIE_SECURE=true, and should use real (not demo) accounts.
+
+  Docker (database + app in containers): see docs\DEPLOYMENT.md
+    docker compose up -d --build
+
+
+----------------------------------------------------------------------
+F. PROBLEMS
+----------------------------------------------------------------------
+
+  "Invalid environment configuration"
+      -> .env is missing or a value is wrong. Compare with .env.example.
+
+  "ECONNREFUSED ... 5544" / database errors
+      -> the database is not running. Do step B1.
+
+  Website opens but shows no data / keeps loading on the logo screen
+      -> the API is not running on port 4000. Start it with: npm run dev:api
+
+  "Too many requests"
+      -> the request limit was reached. Wait 15 minutes, or restart the
+         API (npm run dev:api), or raise RATE_LIMIT_MAX in .env.
+
+  "Too many failed attempts" when signing in
+      -> the account is locked for 15 minutes after 5 wrong passwords.
+
+  Port already in use (4000 or 5173)
+      -> another copy is still running. Close it, or in PowerShell:
+           Get-NetTCPConnection -LocalPort 4000 | Select OwningProcess
+           Stop-Process -Id <that number>
+
+  Sample data looks out of date (e.g. no attendance today)
+      -> run npm run db:reset (dates are generated for the day it runs).
+
+  Forgot the demo password
+      -> it is SEED_DEMO_PASSWORD in .env. If you change it, run
+         npm run db:reset again.
+
+  Map is blank
+      -> the map tiles come from OpenStreetMap, which needs an internet
+         connection.
+
+
+More detail: README.md and the docs\ folder
+(ARCHITECTURE, DATABASE, SECURITY, TRACKING, API, DEPLOYMENT, ASSUMPTIONS).

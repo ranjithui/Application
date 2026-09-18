@@ -1,0 +1,86 @@
+# ---------------------------------------------------------------------------
+# Holy Sai Smart School 360 — Render Blueprint
+#
+# One web service builds the Dockerfile and serves both the REST API and the
+# built SPA on a single origin, so the refresh-token cookie stays SameSite=Strict
+# and no CORS configuration is needed.
+#
+# The database is Supabase Postgres, reached through the Supavisor *connection
+# pooler* — Render has no IPv6 outbound and Supabase's direct host
+# (db.<ref>.supabase.co) is IPv6-only. Uploaded documents go to a private
+# Supabase Storage bucket, because Render's filesystem is wiped on every deploy.
+#
+# Values marked `sync: false` are entered in the Render dashboard, never here.
+# See docs/DEPLOYMENT.md for the full walkthrough.
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: holy-sai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    # Singapore is the closest Render region to India.
+    region: singapore
+    plan: starter
+    healthCheckPath: /api/health
+    # Apply any pending migrations before the API accepts traffic. Idempotent:
+    # migrate-lib skips files already recorded in schema_migrations.
+    dockerCommand: sh -c "node backend/dist/scripts/migrate.js && node backend/dist/src/server.js"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+
+      # --- Database (Supabase) ------------------------------------------------
+      # Use the Session pooler URI from Supabase → Project Settings → Database:
+      #   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+      - key: DATABASE_URL
+        sync: false
+      # Supabase terminates TLS with its own CA. 'no-verify' encrypts without
+      # chain verification; to verify properly, set this to 'true' and paste
+      # Supabase's CA bundle into DATABASE_CA_CERT.
+      - key: DATABASE_SSL
+        value: no-verify
+      - key: DATABASE_POOL_MAX
+        value: 10
+
+      # --- Auth ---------------------------------------------------------------
+      # Generated once by Render and then held steady. Changing either value
+      # signs every user out.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: true
+
+      # Single origin, so this only matters for non-browser clients.
+      - key: CORS_ORIGINS
+        fromService:
+          type: web
+          name: holy-sai
+          property: hostport
+
+      # --- Document storage (Supabase Storage) --------------------------------
+      - key: STORAGE_DRIVER
+        value: supabase
+      # https://<ref>.supabase.co
+      - key: SUPABASE_URL
+        sync: false
+      # Project Settings → API → service_role. Server-side only.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: documents
+      - key: UPLOAD_MAX_MB
+        value: 10
+
+      # --- Limits & logging ---------------------------------------------------
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX
+        value: 3000
+      - key: AUTH_RATE_LIMIT_MAX
+        value: 20
+      - key: LOG_LEVEL
+        value: info

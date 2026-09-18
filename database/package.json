@@ -1,0 +1,6 @@
+{
+  "name": "@holysai/database",
+  "private": true,
+  "type": "module",
+  "description": "SQL migrations and sample seed data (run through the backend scripts)"
+}

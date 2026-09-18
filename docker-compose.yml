@@ -1,0 +1,38 @@
+# Production-like stack: PostgreSQL + the API/web image.
+# Secrets come from the environment or a .env file next to this compose file.
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: holysai
+      POSTGRES_USER: holysai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U holysai -d holysai"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://holysai:${POSTGRES_PASSWORD}@db:5432/holysai
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://school.example.com}
+      COOKIE_SECURE: "true"
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "4000:4000"
+    command: ["sh", "-c", "node backend/dist/scripts/migrate.js && node backend/dist/src/server.js"]
+
+volumes:
+  pgdata:
+  uploads:
