@@ -67,6 +67,7 @@ import edu.holysai.app.ui.LocalNav
 import edu.holysai.app.ui.PrimaryButton
 import edu.holysai.app.ui.ScreenList
 import edu.holysai.app.ui.SectionTitle
+import edu.holysai.app.ui.hasParentPortal
 import edu.holysai.app.ui.homeTiles
 import edu.holysai.app.ui.rememberLoad
 import edu.holysai.app.ui.theme.Gold
@@ -182,7 +183,7 @@ fun HomeScreen() {
                 }
             }
         }
-        if (user.can("parent_portal.use")) {
+        if (hasParentPortal(user)) {
             item(span = { GridItemSpan(2) }) { ChildPicker() }
         }
         items(tiles) { f ->

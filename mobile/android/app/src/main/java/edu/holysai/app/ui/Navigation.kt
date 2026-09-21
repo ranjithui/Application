@@ -125,10 +125,17 @@ private val admissions = generic("Admissions Summary", "/api/admissions/dashboar
 
 private fun hasSelfService(u: User) = u.can("selfservice.use") && u.employeeId != null
 
+/**
+ * The parent portal needs a linked parent record, not just the permission: Super Admin
+ * holds every permission through its wildcard grant but has no row in `parents`, and the
+ * API answers 404 PARENT_NOT_LINKED. Gate on both, the way [hasSelfService] does.
+ */
+fun hasParentPortal(u: User) = u.can("parent_portal.use") && u.parentId != null
+
 /** Features the signed-in user may open, in role order. Filtered by API permissions. */
 private fun roleFeatures(u: User): List<Feature> {
     val all = buildList {
-        if (u.can("parent_portal.use")) addAll(listOf(childTrack, childToday, childHomework, childFees, circulars))
+        if (hasParentPortal(u)) addAll(listOf(childTrack, childToday, childHomework, childFees, circulars))
         if (u.roleKey == "staff" && hasSelfService(u)) add(myAttendance)
         if (u.can("dashboard.view") && u.can("students.read")) add(pulse)
         if (u.can("hr.approve")) add(leaveApprovals)
