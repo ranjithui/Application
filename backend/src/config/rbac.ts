@@ -152,12 +152,15 @@ export const ROLES: RoleDef[] = [
   },
   {
     key: 'teacher', name: 'Teacher', scope: 'class', homeRoute: '/teacher',
-    description: 'Attendance, classes, Student 360, academics, AI Co-Pilot for assigned classes',
+    description: 'Attendance, classes, Student 360, academics, AI Co-Pilot for assigned classes; own leave and payslips',
     permissions: [
       'dashboard.view', 'reports.read', 'students.read_assigned', 'attendance.read', 'attendance.mark',
       'academics.read', 'academics.manage', 'assessments.manage', 'earlywarning.read', 'earlywarning.manage',
       'tracking.read_assigned', 'parents.read', 'communication.read', 'communication.send',
       'safety.read', 'transport.read', 'innovation.read', 'innovation.manage', 'ai.use', 'documents.read',
+      // Own attendance, leave, overtime and payslips. Self-scoped: every /me/* route
+      // resolves req.user.employeeId and never takes an id from the request.
+      'selfservice.use',
     ],
   },
   {
