@@ -11,7 +11,7 @@ import { fmt } from '@/lib/format';
 import { iconPaths } from '@/lib/legacy-icons';
 import type { CampusPoint, PathPoint, RouteRow } from './types';
 
-const DEFAULT_TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const DEFAULT_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const DEFAULT_CENTER: [number, number] = [12.845, 80.06];
 
 function useTiles() {
@@ -103,7 +103,7 @@ export function BusFleetMap({ routes, campuses, selectedId, onSelect, trail = []
   return (
     <div className={`mapbox${height !== 'default' ? ` mapbox--${height}` : ''}`}>
       <MapContainer center={fit[0] ?? DEFAULT_CENTER} zoom={12} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
-        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} />
+        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} referrerPolicy="strict-origin-when-cross-origin" />
         <FitBounds points={fit} />
         {campuses.map((c) => (
           <span key={c.id}>
@@ -172,7 +172,7 @@ export function RouteStopsMap({ stops, campuses = [], pending, onPick }: {
   return (
     <div className="mapbox mapbox--short">
       <MapContainer center={fit[0] ?? DEFAULT_CENTER} zoom={12} scrollWheelZoom style={{ width: '100%', height: '100%', cursor: onPick ? 'crosshair' : undefined }}>
-        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} />
+        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} referrerPolicy="strict-origin-when-cross-origin" />
         <FitBounds points={fit} maxZoom={15} />
         <ClickCapture onClick={onPick} />
         {campuses.map((c) => (

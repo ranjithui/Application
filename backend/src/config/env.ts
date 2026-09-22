@@ -60,7 +60,7 @@ const schema = z.object({
   /** Per-device request limit on POST /api/v1/location. */
   DEVICE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
   MAP_API_KEY: z.string().optional(),
-  MAP_TILE_URL: z.string().default('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
+  MAP_TILE_URL: z.string().default('https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
   SEED_DEMO_PASSWORD: z.string().optional(),
   WHATSAPP_API_URL: z.string().optional(),
   WHATSAPP_API_TOKEN: z.string().optional(),

@@ -41,6 +41,10 @@ export function createApp() {
       },
     },
     crossOriginResourcePolicy: { policy: 'same-site' },
+    // Helmet's default is no-referrer, but OpenStreetMap's tile servers refuse
+    // browser requests without a Referer ("Access blocked" tiles). Send only the
+    // origin to other sites; full URLs (which contain student ids) stay private.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
 
   app.use(cors({
@@ -97,7 +101,7 @@ function serveWeb(app: express.Express, dir: string) {
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org', 'https://unpkg.com'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https://tile.openstreetmap.org', 'https://*.tile.openstreetmap.org', 'https://unpkg.com'],
       connectSrc: ["'self'"],
       frameAncestors: ["'none'"],
     },

@@ -11,7 +11,7 @@ import type { LocationPoint, LocationStatus } from '@/api/types';
 import { fmt } from '@/lib/format';
 import { iconPaths } from '@/lib/legacy-icons';
 
-const DEFAULT_TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const DEFAULT_TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 function useTiles() {
   const q = useQuery({
@@ -122,7 +122,7 @@ export function StudentMap({
   return (
     <div className={`mapbox${height !== 'default' ? ` mapbox--${height}` : ''}`}>
       <MapContainer center={center} zoom={13} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
-        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} />
+        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} referrerPolicy="strict-origin-when-cross-origin" />
         <FitBounds points={points} />
         <FlyTo target={selected ? [Number(selected.latitude), Number(selected.longitude)] : null} />
         {campuses.map((c) => (
@@ -198,7 +198,7 @@ export function HistoryMap({ points, selectedId, onSelect, campuses = [] }: { po
   return (
     <div className="mapbox mapbox--tall">
       <MapContainer center={path[0] ?? [11.0168, 76.9558]} zoom={13} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
-        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} />
+        <TileLayer url={tiles.url} attribution={tiles.attribution} maxZoom={19} referrerPolicy="strict-origin-when-cross-origin" />
         <FitBounds points={path.length ? path : campuses.map((c) => [Number(c.latitude), Number(c.longitude)] as [number, number])} maxZoom={17} />
         <FlyTo target={selected ? [Number(selected.latitude), Number(selected.longitude)] : null} />
         {campuses.map((c) => (
