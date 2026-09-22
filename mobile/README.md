@@ -45,3 +45,23 @@ On the sign-in screen tap **Use this phone as a GPS tracker** — no user accoun
 
 Permissions: fine location, notifications (Android 13+), camera (setup QR). Set the app's battery
 usage to **Unrestricted** on tracker phones. Details: [docs/GPS-DEVICES.md](../docs/GPS-DEVICES.md).
+
+## Stand-alone GPS Tracker app (`tracker` module)
+
+A separate, small APK — **Holy Sai GPS Tracker** (`edu.holysai.tracker`) — for phones that only act as
+a student's GPS device. Same setup QR, same `POST /api/v1/location`, no sign-in. On top of the tracker
+mode above it adds:
+
+- resumes tracking after a reboot or app update (needs location **Allow all the time**),
+- a partial wake lock so points keep going out with the screen off,
+- a reliability checklist (location on, "all the time" access, battery unrestricted) with fix buttons,
+- satellites used/seen, speed and fix time, a **Send now** button and an activity log for testing.
+
+```bash
+cd mobile/android
+./gradlew :tracker:assembleRelease     # tracker/build/outputs/apk/release/tracker-release.apk
+./gradlew :tracker:assembleDebug       # debug build: plain HTTP allowed, e.g. http://192.168.1.20:4000
+```
+
+The release build accepts HTTPS only (plus the emulator/localhost hosts). To test a phone against
+an API on your PC, install the debug APK and enter `http://<PC LAN IP>:4000` as the server.
