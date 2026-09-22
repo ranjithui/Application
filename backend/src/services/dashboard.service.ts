@@ -56,7 +56,11 @@ export async function commandCenter(user: AuthUser, campusId: string | null) {
                 count(sa.id) FILTER (WHERE sa.status IN ('Present', 'Late', 'Half Day'))::int AS present,
                 count(sa.id) FILTER (WHERE sa.status = 'Absent')::int AS absent,
                 count(sa.id) FILTER (WHERE sa.status = 'On Leave')::int AS "onLeave",
-                count(sa.id) FILTER (WHERE sa.status = 'Late')::int AS late
+                count(sa.id) FILTER (WHERE sa.status = 'Late')::int AS late,
+                count(*) FILTER (WHERE e.employee_type = 'teaching')::int AS teaching,
+                count(*) FILTER (WHERE e.employee_type = 'non_teaching')::int AS "nonTeaching",
+                count(sa.id) FILTER (WHERE e.employee_type = 'teaching' AND sa.status IN ('Present', 'Late', 'Half Day'))::int AS "teachingPresent",
+                count(sa.id) FILTER (WHERE e.employee_type = 'non_teaching' AND sa.status IN ('Present', 'Late', 'Half Day'))::int AS "nonTeachingPresent"
            FROM employees e LEFT JOIN staff_attendance sa ON sa.employee_id = e.id AND sa.attendance_date = current_date
           WHERE e.deleted_at IS NULL AND e.employment_status = 'active' AND ($1::uuid IS NULL OR e.campus_id = $1)`, [c]),
   ]);
