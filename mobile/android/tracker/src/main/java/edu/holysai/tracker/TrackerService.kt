@@ -60,6 +60,8 @@ data class TrackerStatus(
     val lastSentAt: Long? = null,
     val lastStudent: String? = null,
     val sentCount: Int = 0,
+    val failedCount: Int = 0,
+    val startedAt: Long? = null,
     val queued: Int = 0,
     val message: String? = null,
     val messageIsError: Boolean = false,
@@ -174,7 +176,10 @@ class TrackerService : Service() {
             loop = scope.launch { runLoop() }
             log("Tracking started · device ${TrackerConfig.deviceId}", true)
         }
-        _status.update { it.copy(running = true, queued = TrackerConfig.queue().size, message = "Waiting for GPS fix…", messageIsError = false) }
+        _status.update {
+            it.copy(running = true, startedAt = it.startedAt ?: System.currentTimeMillis(), queued = TrackerConfig.queue().size,
+                message = "Waiting for GPS fix…", messageIsError = false)
+        }
         return START_STICKY
     }
 
@@ -186,7 +191,7 @@ class TrackerService : Service() {
             lm.unregisterGnssStatusCallback(gnssCallback)
         }
         wakeLock?.takeIf { it.isHeld }?.release()
-        _status.update { it.copy(running = false, satellitesUsed = null, satellitesVisible = null, message = "Tracking stopped", messageIsError = false) }
+        _status.update { it.copy(running = false, startedAt = null, satellitesUsed = null, satellitesVisible = null, message = "Tracking stopped", messageIsError = false) }
         super.onDestroy()
     }
 
@@ -305,7 +310,7 @@ class TrackerService : Service() {
             val result = try {
                 post(p)
             } catch (e: IOException) {
-                _status.update { it.copy(queued = queue.size, message = "No connection — ${queue.size} point(s) waiting", messageIsError = true) }
+                _status.update { it.copy(queued = queue.size, failedCount = it.failedCount + 1, message = "No connection — ${queue.size} point(s) waiting", messageIsError = true) }
                 log("No connection (${e.javaClass.simpleName}) · ${queue.size} waiting", false)
                 updateNotification("Offline · ${queue.size} waiting")
                 TrackerConfig.saveQueue(queue)
@@ -335,7 +340,7 @@ class TrackerService : Service() {
                 code == 429 || code >= 500 -> {
                     TrackerConfig.saveQueue(queue)
                     val msg = if (code == 429) "Server busy — will retry" else "Server error ($code) — will retry"
-                    _status.update { it.copy(queued = queue.size, message = msg, messageIsError = true) }
+                    _status.update { it.copy(queued = queue.size, failedCount = it.failedCount + 1, message = msg, messageIsError = true) }
                     log(msg, false)
                     return
                 }
@@ -344,7 +349,7 @@ class TrackerService : Service() {
                     // tracking off, too old, wrong server address). Drop it and say why.
                     queue.removeAt(0)
                     val msg = json.optString("message").ifBlank { "Point refused ($code)" }
-                    _status.update { it.copy(queued = queue.size, message = msg, messageIsError = true) }
+                    _status.update { it.copy(queued = queue.size, failedCount = it.failedCount + 1, message = msg, messageIsError = true) }
                     log("$code · $msg", false)
                     updateNotification(msg)
                 }

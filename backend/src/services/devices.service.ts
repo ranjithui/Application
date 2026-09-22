@@ -8,7 +8,7 @@ import { AppError, conflict, forbidden, notFound, unauthorized } from '../utils/
 import { nextCode } from '../utils/codes.js';
 import { resolveStudentId } from './access.service.js';
 import { audit, clientIp } from './audit.service.js';
-import { checkRecordedAt, gpsStatusSql, storeLocation, trackingAllowed, type GpsStatus } from './tracking.service.js';
+import { checkRecordedAt, gpsStatusSql, haversineMetres, storeLocation, trackingAllowed, type GpsStatus } from './tracking.service.js';
 
 // ---------------------------------------------------------------------------
 // Device tokens
@@ -512,4 +512,65 @@ export async function latestForDevice(deviceId: string) {
       ORDER BY l.recorded_at DESC, l.id DESC LIMIT 1`,
     [deviceId],
   );
+}
+
+/**
+ * What the tracker phone shows about itself, as the server sees it: its
+ * assigned student, today's points and distance, and its last contact.
+ * Authenticated by the device token alone (only its hash is stored).
+ */
+export async function deviceSelfStatus(req: Request) {
+  const [kind, token] = (req.get('authorization') || '').split(' ');
+  if (kind !== 'Bearer' || !token || !token.startsWith(TOKEN_PREFIX) || token.length > 200) {
+    return authFailed(req, undefined, 'missing or malformed token');
+  }
+  const d = await one(
+    `${DEVICE_SQL} WHERE d.token_hash = $1`, [hashDeviceToken(token)],
+  );
+  if (!d) return authFailed(req, undefined, 'status: token does not match');
+
+  const tracking = d.studentId
+    ? await one<{ tracking_enabled: boolean; tracking_status: string }>(
+      'SELECT tracking_enabled, tracking_status FROM student_tracking_profiles WHERE student_id = $1', [d.studentId])
+    : null;
+  // Points this device recorded for its current student today (school timezone).
+  const today = d.studentId
+    ? await many<{ latitude: number; longitude: number; recorded_at: Date }>(
+      `SELECT latitude, longitude, recorded_at FROM student_locations
+        WHERE device_id = $1 AND student_id = $2
+          AND recorded_at >= (now() AT TIME ZONE 'Asia/Kolkata')::date AT TIME ZONE 'Asia/Kolkata'
+        ORDER BY recorded_at, id`,
+      [d.id, d.studentId])
+    : [];
+  let metres = 0;
+  for (let i = 1; i < today.length; i++) {
+    metres += haversineMetres(today[i - 1].latitude, today[i - 1].longitude, today[i].latitude, today[i].longitude);
+  }
+  const total = d.assignmentId
+    ? await one<{ n: number }>(
+      `SELECT count(*)::int AS n FROM student_locations WHERE device_id = $1 AND student_id = $2 AND recorded_at >= $3`,
+      [d.id, d.studentId, d.assignedAt])
+    : null;
+
+  return {
+    device: {
+      deviceCode: d.deviceCode, deviceType: d.deviceType, status: d.status, gpsStatus: d.gpsStatus,
+      lastSeenAt: d.lastSeenAt, batteryPct: d.batteryPct,
+    },
+    student: d.studentId ? {
+      admissionNo: d.admissionNo, fullName: d.studentName, grade: d.grade, section: d.section, assignedAt: d.assignedAt,
+      trackingEnabled: !!tracking?.tracking_enabled && tracking.tracking_status !== 'disabled',
+      trackingStatus: tracking?.tracking_status ?? 'disabled',
+    } : null,
+    today: {
+      points: today.length,
+      distanceKm: Math.round(metres / 10) / 100,
+      firstAt: today[0]?.recorded_at ?? null,
+      lastAt: today[today.length - 1]?.recorded_at ?? null,
+    },
+    assignmentPoints: total?.n ?? 0,
+    intervalSeconds: env.LOCATION_INTERVAL_SECONDS,
+    thresholds: { onlineSeconds: env.ONLINE_THRESHOLD_SECONDS, offlineSeconds: env.OFFLINE_THRESHOLD_SECONDS },
+    serverTime: new Date().toISOString(),
+  };
 }

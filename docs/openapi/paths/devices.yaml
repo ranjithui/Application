@@ -229,3 +229,12 @@
     responses:
       '200': { $ref: '#/components/responses/Ok' }
       '409': { description: ASSIGNMENT_INACTIVE }
+
+/v1/device/status:
+  get:
+    tags: [GPS Devices]
+    summary: "The device's own view (tracker app dashboard): assigned student, today's points and distance, last contact"
+    security: [{ deviceToken: [] }]
+    responses:
+      '200': { $ref: '#/components/responses/Ok' }
+      '401': { description: DEVICE_AUTH_FAILED }

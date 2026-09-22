@@ -61,6 +61,12 @@ A 401 (token revoked) stops tracking and asks for a new setup QR. 409 / 403 answ
 tracking off, device disabled) are shown on screen and the point is dropped. Tracking resumes when the
 app is reopened; it does not restart by itself after a reboot.
 
+**Tracker app v2 — scan the label to connect:** in the stand-alone tracker app, *Scan device QR* on
+the device label, an administrator signs in once on the phone (the token is issued directly to the
+phone; the admin is signed out afterwards), then picks the student. The app's dashboard reads
+`GET /api/v1/device/status` (device token) for the assigned student, today's points and distance and
+the server's view of the device.
+
 **Dedicated tracker phones:** the stand-alone *Holy Sai GPS Tracker* app (`mobile/android/tracker`)
 uses the same setup QR and also resumes after a reboot (with location allowed *all the time*),
 keeps sending with the screen off, and shows satellites, a *Send now* button and a send log for testing.

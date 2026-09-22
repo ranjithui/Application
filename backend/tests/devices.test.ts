@@ -226,6 +226,33 @@ describe('assignment rules', () => {
     expect(after).toBe(newest.id);
   });
 
+  it('the tracker app sees its own student and today’s figures', async () => {
+    const r = await request(app).get('/api/v1/device/status').set('Authorization', `Bearer ${token}`);
+    expect(r.status).toBe(200);
+    expect(r.body.data.device).toMatchObject({ deviceCode: CODE, status: 'assigned', gpsStatus: 'online' });
+    expect(r.body.data.student).toMatchObject({ admissionNo: STU2, trackingEnabled: true });
+    expect(r.body.data.today.points).toBeGreaterThanOrEqual(1);
+    expect(r.body.data.intervalSeconds).toBe(30);
+    // No token, or someone else's, gets nothing.
+    expect((await request(app).get('/api/v1/device/status')).status).toBe(401);
+    expect((await request(app).get('/api/v1/device/status').set('Authorization', 'Bearer hsd_nope')).status).toBe(401);
+  });
+
+  it('phone connect flow: admin signs in on the phone, issues a token for a scanned label, assigns it', async () => {
+    const admin = await as('principal');
+    const spare = (await admin.get('/api/devices/lookup?code=GPS009001')).body.data;
+    expect(spare.status).toBe('available');
+    const t = await admin.post(`/api/devices/${spare.deviceCode}/token`);
+    expect(t.status).toBe(200);
+    const s1 = await request(app).get('/api/v1/device/status').set('Authorization', `Bearer ${t.body.data.token}`);
+    expect(s1.body.data.student).toBeNull();
+    const a = await admin.post('/api/device-assignments', { studentId: STU1, deviceId: spare.deviceCode, reassign: true });
+    expect(a.status).toBe(201);
+    const s2 = await request(app).get('/api/v1/device/status').set('Authorization', `Bearer ${t.body.data.token}`);
+    expect(s2.body.data.student.admissionNo).toBe(STU1);
+    await admin.post(`/api/device-assignments/${a.body.data.id}/unassign`, {});
+  });
+
   it('reports inventory and connectivity', async () => {
     const r = await (await as('principal')).get('/api/devices/summary');
     expect(r.status).toBe(200);

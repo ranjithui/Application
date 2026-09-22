@@ -33,6 +33,11 @@ deviceIngestRoutes.post('/location', deviceLimiter, validate(deviceLocationSchem
   return res.status(201).json({ success: true, ...r, message: 'Location received' });
 });
 
+// The tracker app's own dashboard: assigned student, today's points and distance.
+deviceIngestRoutes.get('/device/status', deviceLimiter, async (req: Request, res: Response) => {
+  return ok(res, await devices.deviceSelfStatus(req), 'Device status');
+});
+
 // ---------------------------------------------------------------------------
 // Admin: device registry (/api/devices) and assignments (/api/device-assignments)
 // ---------------------------------------------------------------------------

@@ -57,6 +57,19 @@ mode above it adds:
 - a reliability checklist (location on, "all the time" access, battery unrestricted) with fix buttons,
 - satellites used/seen, speed and fix time, a **Send now** button and an activity log for testing.
 
+**Version 2 — connect by scanning the device label.** No setup QR is needed any more:
+
+1. Open the app → **Scan device QR** → scan the label printed on GPS Devices (or tap
+   *No label? Register this phone as a new device*).
+2. An administrator (holding `tracking.manage`) signs in **once** on the phone. The server issues the
+   device token straight to the phone; the admin session is signed out when the wizard closes.
+3. Pick the student (search by name or admission number). Reassigning asks first.
+4. Tracking starts. The dashboard shows what the **server** has stored — the student, points and
+   distance today, first/last point, and whether the server sees the device as online — plus this
+   session's running time, points sent, failures and success rate (`GET /api/v1/device/status`).
+
+The old setup QR (`holysai-tracker:setup?…`) and manual entry still work.
+
 ```bash
 cd mobile/android
 ./gradlew :tracker:assembleRelease     # tracker/build/outputs/apk/release/tracker-release.apk

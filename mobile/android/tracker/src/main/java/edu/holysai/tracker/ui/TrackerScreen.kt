@@ -75,9 +75,13 @@ import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import edu.holysai.tracker.ServerException
+import edu.holysai.tracker.ServerStatus
 import edu.holysai.tracker.TrackerConfig
 import edu.holysai.tracker.TrackerService
 import edu.holysai.tracker.TrackerStatus
+import kotlinx.coroutines.delay
+import java.time.Instant
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -97,11 +101,16 @@ fun TrackerScreen(pendingSetup: String?) {
     var showManual by remember { mutableStateOf(false) }
     var showQr by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
+    var connectMode by remember { mutableStateOf<ConnectMode?>(null) }
+    var server by remember { mutableStateOf<ServerStatus?>(null) }
+    var serverError by remember { mutableStateOf<String?>(null) }
     // Bumped on resume so the checklist re-reads permissions changed in Settings.
     var resumes by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) { resumes++; onPauseOrDispose { } }
 
     fun applySetup(text: String) {
+        // A device label QR (just the device ID) → connect through an admin sign-in on this phone.
+        TrackerConfig.labelCode(text)?.let { code -> setupMessage = null; connectMode = ConnectMode.Link(code.uppercase()); return }
         val err = TrackerConfig.applySetup(text)
         if (err == null) {
             if (status.running) TrackerService.stop(context)
@@ -132,6 +141,21 @@ fun TrackerScreen(pendingSetup: String?) {
         if (missing.isEmpty()) TrackerService.start(context) else permissions.launch(missing.toTypedArray())
     }
 
+    // What the server has recorded for this phone: student, today's points, distance, last contact.
+    LaunchedEffect(configured, resumes, status.sentCount) {
+        if (!configured) { server = null; return@LaunchedEffect }
+        while (true) {
+            try {
+                server = ServerStatus.fetch(); serverError = null
+            } catch (e: ServerException) {
+                serverError = if (e.status == 401) "The server does not accept this phone's token. Tap “Change device” and connect again." else e.message
+            } catch (e: Exception) {
+                serverError = "Cannot reach the server right now."
+            }
+            delay(30_000)
+        }
+    }
+
     // Resume tracking after the app was closed (or killed) while tracking was on.
     LaunchedEffect(Unit) {
         if (TrackerConfig.enabled && TrackerConfig.isConfigured && !status.running && TrackerService.hasLocationPermission(context)) {
@@ -150,9 +174,11 @@ fun TrackerScreen(pendingSetup: String?) {
         ) {
             if (!configured) {
                 SetupCard(onScan = {
-                    scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the setup QR from GPS Devices").setBeepEnabled(false).setOrientationLocked(false))
-                }, onManual = { showManual = true })
+                    scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the QR label on the device").setBeepEnabled(false).setOrientationLocked(false))
+                }, onRegister = { connectMode = ConnectMode.Register }, onManual = { showManual = true })
             } else {
+                ServerCard(server, serverError, onAssign = { connectMode = ConnectMode.AssignOnly })
+                SessionCard(status)
                 StatusCard(status)
                 if (status.running) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -199,10 +225,22 @@ fun TrackerScreen(pendingSetup: String?) {
         applySetup("holysai-tracker:setup?server=${Uri.encode(server)}&device=${Uri.encode(device)}&token=${Uri.encode(token)}")
     }
     if (showQr) DeviceQrDialog(TrackerConfig.deviceId) { showQr = false }
+    connectMode?.let { mode ->
+        ConnectDialog(mode) { connected ->
+            connectMode = null
+            configured = TrackerConfig.isConfigured
+            resumes++
+            if (connected) {
+                if (status.running) TrackerService.stop(context)
+                setupMessage = "Ready. This phone is ${TrackerConfig.deviceId}."
+                start()
+            }
+        }
+    }
     if (confirmReset) AlertDialog(
         onDismissRequest = { confirmReset = false },
         title = { Text("Remove this device setup?") },
-        text = { Text("Tracking stops and the device token is deleted from this phone. You will need a new setup QR to track again.") },
+        text = { Text("Tracking stops and the device token is deleted from this phone. To track again, scan a device QR and have an administrator sign in.") },
         confirmButton = {
             TextButton(onClick = {
                 confirmReset = false
@@ -217,24 +255,97 @@ fun TrackerScreen(pendingSetup: String?) {
 }
 
 @Composable
-private fun SetupCard(onScan: () -> Unit, onManual: () -> Unit) {
+private fun SetupCard(onScan: () -> Unit, onRegister: () -> Unit, onManual: () -> Unit) {
     Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Set up this phone as a GPS device", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Connect this phone", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
-                "1. On the web: Safety & Transport → GPS Devices → Register device, type “Android phone”.\n" +
-                    "2. Choose “Android phone setup” in the token window.\n" +
-                    "3. Scan that QR here.\n" +
-                    "4. Tap “Show device QR” and scan it on the student's page to assign this phone.",
+                "Scan the QR label of a GPS device registered on the web. An administrator signs in once on this phone, " +
+                    "then picks the student. After that the phone sends its location in the background.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Button(onClick = onScan, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 Icon(Icons.Outlined.QrCodeScanner, null)
                 Spacer(Modifier.size(8.dp))
-                Text("Scan setup QR")
+                Text("Scan device QR")
             }
-            TextButton(onClick = onManual, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Enter details manually") }
+            OutlinedButton(onClick = onRegister, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("No label? Register this phone as a new device") }
+            TextButton(onClick = onManual, modifier = Modifier.align(Alignment.CenterHorizontally)) { Text("Enter setup details manually") }
         }
+    }
+}
+
+/** What the server has stored for this phone — proof the locations are arriving. */
+@Composable
+private fun ServerCard(s: ServerStatus?, error: String?, onAssign: () -> Unit) {
+    val fmt = remember { DateFormat.getTimeInstance(DateFormat.SHORT) }
+    fun time(iso: String?) = iso?.let { runCatching { fmt.format(Date.from(Instant.parse(it))) }.getOrNull() } ?: "—"
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("TRACKING FOR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            when {
+                s == null && error == null -> Text("Checking with the server…", style = MaterialTheme.typography.bodyMedium)
+                s == null -> Text(error ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                s.studentName == null -> {
+                    Text("Not assigned to a student", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Amber)
+                    Text("The server refuses locations until this device is assigned.", style = MaterialTheme.typography.bodySmall)
+                }
+                else -> {
+                    Text(s.studentName, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(listOfNotNull(s.admissionNo, s.grade).joinToString(" · "), style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!s.trackingEnabled) Text("Tracking is switched off for this student on the web — locations are refused.",
+                        style = MaterialTheme.typography.bodySmall, color = Danger)
+                }
+            }
+            if (s != null) {
+                if (s.deviceStatus !in listOf("assigned", "available")) Text("Device is ${s.deviceStatus} on the server — locations are refused.",
+                    style = MaterialTheme.typography.bodySmall, color = Danger)
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Metric("Today", "${s.todayPoints}", "points", Modifier.weight(1f))
+                    Metric("Distance", String.format(Locale.US, "%.2f", s.todayKm), "km today", Modifier.weight(1f))
+                    Metric("Server sees", s.gpsStatus.uppercase(), "last ${time(s.lastSeenAt)}", Modifier.weight(1f),
+                        color = when (s.gpsStatus) { "online" -> Teal; "stale" -> Amber; else -> Danger })
+                }
+                Field("First point today", time(s.todayFirst))
+                Field("Last point stored", time(s.todayLast))
+                Field("Points since assigned", "${s.assignmentPoints}")
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            }
+            TextButton(onClick = onAssign, contentPadding = PaddingValues(0.dp)) {
+                Text(if (s?.studentName == null) "Assign student (admin)" else "Change student (admin)")
+            }
+        }
+    }
+}
+
+/** This phone's own sending record since tracking was started. */
+@Composable
+private fun SessionCard(s: TrackerStatus) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(s.running) { while (s.running) { now = System.currentTimeMillis(); delay(1_000) } }
+    val attempts = s.sentCount + s.failedCount
+    val uptime = s.startedAt?.let { (now - it).coerceAtLeast(0) / 1000 }?.let { String.format(Locale.US, "%d:%02d:%02d", it / 3600, (it / 60) % 60, it % 60) } ?: "—"
+    Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("THIS SESSION", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Metric("Running", uptime, if (s.running) "h:m:s" else "stopped", Modifier.weight(1f))
+                Metric("Sent", "${s.sentCount}", if (s.queued > 0) "${s.queued} waiting" else "points", Modifier.weight(1f))
+                Metric("Success", if (attempts == 0) "—" else "${s.sentCount * 100 / attempts}%", "${s.failedCount} failed", Modifier.weight(1f),
+                    color = if (s.failedCount == 0) Teal else Amber)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Metric(label: String, value: String, sub: String, modifier: Modifier = Modifier, color: Color? = null) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = color ?: MaterialTheme.colorScheme.onSurface, maxLines = 1)
+        Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
 

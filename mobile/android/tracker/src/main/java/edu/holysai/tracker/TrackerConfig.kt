@@ -60,6 +60,26 @@ object TrackerConfig {
         prefs.edit().remove("deviceId").remove("token").remove("enabled").remove("queue").apply()
     }
 
+    /** Saves a connection made in the app (admin sign-in) or from a setup QR. */
+    fun connect(server: String, device: String, token: String) {
+        this.server = server
+        this.deviceId = device
+        this.token = token
+        prefs.edit().remove("queue").apply()
+    }
+
+    /** A device label QR holds only the device ID (or HSDEV:…, a URL ending in it, an IMEI). */
+    fun labelCode(text: String): String? {
+        val t = text.trim()
+        if (t.startsWith("holysai-tracker:", ignoreCase = true)) return null
+        val code = when {
+            t.startsWith("HSDEV:", ignoreCase = true) -> t.substring(6)
+            t.startsWith("http", ignoreCase = true) -> Uri.parse(t).let { it.getQueryParameter("device") ?: it.lastPathSegment } ?: t
+            else -> t
+        }.trim()
+        return code.takeIf { Regex("^[A-Za-z0-9][A-Za-z0-9-]{2,49}$").matches(it) }
+    }
+
     /**
      * Applies a setup QR from the GPS Devices page:
      *   holysai-tracker:setup?server=https://…&device=GPS000123&token=hsd_…
@@ -81,10 +101,7 @@ object TrackerConfig {
         val device = params["device"].orEmpty()
         val token = params["token"].orEmpty()
         if (!server.startsWith("http") || device.isBlank() || !token.startsWith("hsd_")) return "The setup code is incomplete."
-        this.server = server
-        this.deviceId = device
-        this.token = token
-        prefs.edit().remove("queue").apply()
+        connect(server, device, token)
         return null
     }
 
