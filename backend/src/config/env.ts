@@ -50,6 +50,15 @@ const schema = z.object({
   /** Service role key — server-side only. Never expose this to the browser. */
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_STORAGE_BUCKET: z.string().default('documents'),
+  /** GPS devices: how often a device should send, and when it counts as online / stale / offline. */
+  LOCATION_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(30),
+  ONLINE_THRESHOLD_SECONDS: z.coerce.number().int().positive().default(120),
+  OFFLINE_THRESHOLD_SECONDS: z.coerce.number().int().positive().default(600),
+  /** Clock drift allowed on a device timestamp, and how old a buffered point may be. */
+  LOCATION_MAX_FUTURE_SECONDS: z.coerce.number().int().nonnegative().default(300),
+  LOCATION_MAX_AGE_HOURS: z.coerce.number().int().positive().default(72),
+  /** Per-device request limit on POST /api/v1/location. */
+  DEVICE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
   MAP_API_KEY: z.string().optional(),
   MAP_TILE_URL: z.string().default('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
   SEED_DEMO_PASSWORD: z.string().optional(),
@@ -61,6 +70,9 @@ const schema = z.object({
   PUSH_FCM_SERVER_KEY: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 }).superRefine((c, ctx) => {
+  if (c.OFFLINE_THRESHOLD_SECONDS <= c.ONLINE_THRESHOLD_SECONDS) {
+    ctx.addIssue({ code: 'custom', path: ['OFFLINE_THRESHOLD_SECONDS'], message: 'must be greater than ONLINE_THRESHOLD_SECONDS' });
+  }
   // Fail at boot rather than at the first upload attempt.
   if (c.STORAGE_DRIVER !== 'supabase') return;
   for (const key of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const) {

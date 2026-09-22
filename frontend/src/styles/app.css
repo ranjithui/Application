@@ -80,6 +80,23 @@ button.person, a.person { text-align: left; }
 .histlist__row:hover, .histlist__row[aria-selected="true"] { background: var(--surface-alt); }
 .histlist__row[aria-selected="true"] { box-shadow: inset 3px 0 0 var(--magenta); }
 
+/* Map popup detail rows */
+.popup-dl { border-collapse: collapse; margin-top: 6px; width: 100%; }
+.popup-dl th { text-align: left; font-weight: 500; color: var(--text-muted); padding: 1px 10px 1px 0; white-space: nowrap; }
+.popup-dl td { padding: 1px 0; }
+.gps-online { color: var(--success); }
+.gps-stale { color: var(--warning); }
+.gps-offline { color: var(--critical); }
+.gps-never { color: var(--text-muted); }
+
+/* QR scanner */
+.qrscan { position: relative; aspect-ratio: 4 / 3; max-height: 320px; width: 100%; border-radius: var(--r-md, 12px); overflow: hidden; background: #111; }
+.qrscan video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qrscan:not([data-state="scanning"]) video { visibility: hidden; }
+.qrscan__idle { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--s-3); color: #fff; background: var(--surface-alt); color: var(--text-muted); }
+.qrscan__frame { position: absolute; inset: 18% 24%; border: 3px solid var(--gold, #fff); border-radius: 14px; box-shadow: 0 0 0 999px rgba(0,0,0,.35); pointer-events: none; }
+.qrcode svg { width: 100%; height: 100%; display: block; }
+
 /* Sample data ribbon */
 .sample-note { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-micro); color: var(--caution); background: var(--caution-tint); border: 1px solid var(--caution-line); border-radius: var(--r-pill); padding: 2px 10px; font-weight: 600; }
 

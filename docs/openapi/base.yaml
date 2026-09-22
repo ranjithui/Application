@@ -29,6 +29,7 @@ tags:
   - { name: Dashboard }
   - { name: Students, description: Student register and Student 360 }
   - { name: Tracking, description: Student GPS tracking, maps and location history }
+  - { name: GPS Devices, description: 'Device registry, student ↔ device assignments, and the one device location endpoint' }
   - { name: Parents, description: Parent records and the parent portal (own children only) }
   - { name: Academics }
   - { name: Admissions }
@@ -47,6 +48,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    deviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: 'hsd_… device token (shown once at registration)'
+      description: 'GPS devices only. Sent by the device on POST /v1/location; never a user token.'
   parameters:
     Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
     PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 25 } }

@@ -70,10 +70,20 @@ class AppNav(
 
 val LocalNav = staticCompositionLocalOf<AppNav> { error("No navigation") }
 
+/** Opens the GPS tracker, optionally with a setup code to apply. A new instance re-opens it. */
+class TrackerLaunch(val setup: String? = null)
+
 @Composable
-fun AppRoot() {
+fun AppRoot(trackerLaunch: TrackerLaunch? = null) {
     var booting by remember { mutableStateOf(true) }
     var user by remember { mutableStateOf<User?>(null) }
+    var tracker by remember(trackerLaunch) { mutableStateOf(trackerLaunch) }
+
+    tracker?.let { t ->
+        BackHandler { tracker = null }
+        TrackerScreen(pendingSetup = t.setup, onExit = { tracker = null })
+        return
+    }
 
     LaunchedEffect(Unit) {
         Api.onSessionExpired = { user = null }
@@ -85,7 +95,7 @@ fun AppRoot() {
         booting -> Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        user == null -> LoginScreen(onSignedIn = { user = it })
+        user == null -> LoginScreen(onSignedIn = { user = it }, onTracker = { tracker = TrackerLaunch() })
         else -> MainShell(user!!, onSignOut = { user = null })
     }
 }

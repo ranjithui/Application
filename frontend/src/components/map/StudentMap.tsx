@@ -82,6 +82,10 @@ export interface MapStudent {
   displayStatus?: string;
   recordedAt?: string | null;
   isStale?: boolean;
+  placeLabel?: string | null;
+  batteryPct?: number | null;
+  deviceCode?: string | null;
+  gpsStatus?: 'online' | 'stale' | 'offline' | 'never' | null;
 }
 
 export interface MapCampus {
@@ -142,12 +146,21 @@ export function StudentMap({
               >
                 <Tooltip direction="right">{s.fullName}</Tooltip>
                 <Popup>
-                  <div style={{ minWidth: 180 }}>
+                  <div style={{ minWidth: 200 }}>
                     <strong>{s.fullName}</strong>
                     <div className="t-micro t-muted">{[s.admissionNo, s.grade ? `${s.grade}${s.section ?? ''}` : null].filter(Boolean).join(' · ')}</div>
-                    <div className="mt-2">{s.locationStatusLabel ?? '—'}{s.isStale ? ' (last known)' : ''}</div>
-                    <div className="t-micro coord">{Number(s.latitude).toFixed(4)}, {Number(s.longitude).toFixed(4)}</div>
-                    <div className="t-micro t-muted">Updated {fmt.dateTime(s.recordedAt)}</div>
+                    <div className="mt-2">{s.placeLabel ?? s.locationStatusLabel ?? '—'}{s.isStale ? ' (last known)' : ''}</div>
+                    <table className="popup-dl t-micro">
+                      <tbody>
+                        {s.deviceCode !== undefined && <tr><th>Device</th><td className="coord">{s.deviceCode ?? '—'}</td></tr>}
+                        <tr><th>Latitude</th><td className="coord">{Number(s.latitude).toFixed(7)}</td></tr>
+                        <tr><th>Longitude</th><td className="coord">{Number(s.longitude).toFixed(7)}</td></tr>
+                        {s.accuracy != null && <tr><th>Accuracy</th><td>{Number(s.accuracy).toFixed(1)} m</td></tr>}
+                        {s.recordedAt && <tr><th>Last updated</th><td>{fmt.time(s.recordedAt)} <span className="t-muted">{fmt.date(s.recordedAt)}</span></td></tr>}
+                        {s.batteryPct != null && <tr><th>Battery</th><td>{s.batteryPct}%</td></tr>}
+                        {s.gpsStatus && <tr><th>GPS status</th><td><strong className={`gps-${s.gpsStatus}`}>{s.gpsStatus === 'never' ? 'NO CONTACT' : s.gpsStatus.toUpperCase()}</strong></td></tr>}
+                      </tbody>
+                    </table>
                     {onOpenProfile && (
                       <button type="button" className="btn btn--primary btn--sm mt-2" onClick={() => onOpenProfile(s.studentId)}>Open Student 360</button>
                     )}

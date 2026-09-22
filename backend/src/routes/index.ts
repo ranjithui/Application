@@ -5,6 +5,7 @@ import publicRoutes from './public.routes.js';
 import coreRoutes from './core.routes.js';
 import studentRoutes from './students.routes.js';
 import trackingRoutes from './tracking.routes.js';
+import { assignmentRoutes, deviceIngestRoutes, deviceRoutes } from './devices.routes.js';
 import parentRoutes from './parents.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import academicsRoutes from './academics.routes.js';
@@ -23,6 +24,8 @@ export const api = Router();
 // ---- Public -------------------------------------------------------------
 api.use('/auth', authRoutes);
 api.use('/public', publicRoutes);
+// GPS devices authenticate with their own device token, not a user session.
+api.use('/v1', deviceIngestRoutes);
 
 // ---- Authenticated ------------------------------------------------------
 // Everything below requires a valid access token; each route additionally
@@ -31,6 +34,8 @@ api.use(authenticate);
 api.use('/', coreRoutes);            // notifications, tasks, search, lookups, audit, users, settings
 api.use('/students', studentRoutes); // students + Student 360 + per-student location
 api.use('/tracking', trackingRoutes);
+api.use('/devices', deviceRoutes);
+api.use('/device-assignments', assignmentRoutes);
 api.use('/parents', parentRoutes);
 api.use('/dashboard', dashboardRoutes);
 api.use('/', academicsRoutes);

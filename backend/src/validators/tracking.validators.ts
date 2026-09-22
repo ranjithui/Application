@@ -7,6 +7,9 @@ export const locationInputSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   accuracy: z.number().min(0).max(10_000).optional(),
+  altitude: z.number().min(-500).max(20_000).optional(),
+  speed: z.number().min(0).max(500).optional(),
+  heading: z.number().min(0).lt(360).optional(),
   locationStatus: z.enum(LOCATION_STATUS).optional(),
   placeLabel: z.string().max(120).optional(),
   source: z.enum(['device', 'bus', 'gate', 'manual', 'sample']).optional(),
@@ -32,5 +35,4 @@ export const trackingListQuery = paginationSchema.extend({
 export const trackingProfileSchema = z.object({
   trackingEnabled: z.boolean().optional(),
   trackingStatus: z.enum(['active', 'paused', 'offline', 'disabled']).optional(),
-  deviceId: z.string().max(64).nullable().optional(),
 }).refine((o) => Object.keys(o).length > 0, { message: 'Nothing to update' });

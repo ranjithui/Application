@@ -103,6 +103,88 @@ export interface CurrentLocation {
   recordedAt: string | null;
   isStale: boolean;
   displayStatus: 'Tracking Active' | 'Tracking Paused' | 'Tracking Disabled' | 'Offline' | 'No Location Yet';
+  speed: number | null;
+  heading: number | null;
+  altitude: number | null;
+  deviceId: string | null;
+  deviceCode: string | null;
+  deviceLastSeenAt: string | null;
+  assignmentId: string | null;
+  gpsStatus: GpsStatus;
+}
+
+/** Device connectivity: online < 2 min, stale < 10 min, offline after (configurable on the server). */
+export type GpsStatus = 'online' | 'stale' | 'offline' | 'never';
+export type DeviceType = 'gps_tracker' | 'id_card_tag' | 'wearable' | 'mobile_app';
+export type DeviceStatus = 'available' | 'assigned' | 'inactive' | 'maintenance' | 'lost';
+
+export interface GpsDevice {
+  id: string;
+  deviceCode: string;
+  imei: string | null;
+  serialNumber: string | null;
+  deviceType: DeviceType;
+  firmwareVersion: string | null;
+  campusId: string | null;
+  campusName: string | null;
+  status: DeviceStatus;
+  lastSeenAt: string | null;
+  batteryPct: number | null;
+  notes: string | null;
+  hasToken: boolean;
+  tokenIssuedAt: string | null;
+  isSampleData: boolean;
+  createdAt: string;
+  gpsStatus: GpsStatus;
+  assignmentId: string | null;
+  assignedAt: string | null;
+  studentId: string | null;
+  admissionNo: string | null;
+  studentName: string | null;
+  grade: string | null;
+  section: string | null;
+}
+
+export interface DeviceAssignment {
+  id: string;
+  status: 'active' | 'inactive';
+  assignedAt: string;
+  unassignedAt: string | null;
+  unassignReason: string | null;
+  notes: string | null;
+  studentId: string;
+  admissionNo: string;
+  studentName: string;
+  grade?: string | null;
+  section?: string | null;
+  deviceId?: string;
+  deviceCode?: string;
+  deviceType?: DeviceType;
+  deviceStatus?: DeviceStatus;
+  lastSeenAt?: string | null;
+  gpsStatus?: GpsStatus;
+  assignedBy: string | null;
+  unassignedBy: string | null;
+  locationCount?: number;
+}
+
+export interface GpsDeviceDetail extends GpsDevice {
+  assignments: DeviceAssignment[];
+}
+
+export interface DeviceSummary {
+  total: number;
+  assigned: number;
+  available: number;
+  outOfService: number;
+  maintenance: number;
+  lost: number;
+  online: number;
+  stale: number;
+  offline: number;
+  lowBattery: number;
+  thresholds: { onlineSeconds: number; offlineSeconds: number };
+  intervalSeconds: number;
 }
 
 export interface LocationPoint {
@@ -116,6 +198,10 @@ export interface LocationPoint {
   source: string;
   batteryPct: number | null;
   recordedAt: string;
+  speed: number | null;
+  heading: number | null;
+  altitude: number | null;
+  deviceCode: string | null;
 }
 
 export interface LocationHistory {
@@ -138,6 +224,11 @@ export interface MapMarker {
   displayStatus: string;
   recordedAt: string;
   isStale: boolean;
+  placeLabel: string | null;
+  batteryPct: number | null;
+  speed: number | null;
+  deviceCode: string | null;
+  gpsStatus: GpsStatus;
 }
 
 export interface TrackingMapData {
@@ -145,6 +236,7 @@ export interface TrackingMapData {
   campuses: { id: string; code: string; name: string; shortName: string; latitude: number; longitude: number; radiusM: number | null }[];
   summary: { total: number; active: number; offline: number; paused: number; disabled: number; atSchool: number; inTransit: number; atHome: number };
   staleAfterMinutes: number;
+  gpsThresholds: { onlineSeconds: number; offlineSeconds: number };
   generatedAt: string;
 }
 

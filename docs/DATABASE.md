@@ -1,6 +1,6 @@
 # Database schema
 
-PostgreSQL. Generated from the live schema by `backend/scripts/schema-doc.ts` — 132 tables.
+PostgreSQL. Generated from the live schema by `backend/scripts/schema-doc.ts` — 135 tables.
 
 Conventions: uuid primary keys (identity bigints for high-volume logs), business codes are UNIQUE, `created_at`/`updated_at` on every table (trigger-maintained), `created_by`/`updated_by` on business records, `deleted_at` soft delete on master records, foreign keys everywhere, indexes on every lookup path.
 
@@ -15,19 +15,19 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
 | `academic_years` | 8 | — | 3 | 3 |
-| `audit_logs` | 14 | users | 5 | 104 |
+| `audit_logs` | 14 | users | 5 | 30 |
 | `campuses` | 13 | — | 2 | 3 |
 | `classes` | 7 | campuses | 2 | 25 |
 | `employees` | 26 | users, campuses | 5 | 40 |
 | `enrollments` | 9 | students, sections, academic_years | 3 | 68 |
 | `non_teaching_staff` | 6 | employees | 1 | 27 |
-| `parents` | 18 | users | 3 | 78 |
+| `parents` | 18 | users | 3 | 80 |
 | `permissions` | 5 | — | 2 | 61 |
-| `refresh_tokens` | 12 | users, refresh_tokens | 4 | 23 |
-| `role_permissions` | 2 | roles, permissions | 1 | 266 |
+| `refresh_tokens` | 12 | users, refresh_tokens | 4 | 0 |
+| `role_permissions` | 2 | roles, permissions | 1 | 267 |
 | `roles` | 9 | — | 2 | 11 |
 | `sections` | 9 | classes, academic_years, employees | 2 | 58 |
-| `student_guardians` | 7 | students, parents | 2 | 89 |
+| `student_guardians` | 7 | students, parents | 2 | 92 |
 | `students` | 30 | campuses, sections, academic_years, employees, users | 6 | 68 |
 | `subjects` | 7 | — | 2 | 9 |
 | `system_settings` | 7 | users | 1 | 19 |
@@ -39,17 +39,17 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
-| `achievements` | 12 | students, users | 2 | 42 |
+| `achievements` | 12 | students, users | 2 | 38 |
 | `activities` | 6 | employees | 2 | 9 |
 | `assessment_marks` | 10 | assessments, students, users | 3 | 56 |
 | `assessments` | 14 | classes, sections, subjects, academic_years, users | 2 | 12 |
-| `attendance_records` | 12 | students, sections, users | 4 | 4125 |
-| `behaviour_records` | 8 | students, employees | 2 | 41 |
+| `attendance_records` | 12 | students, sections, users | 4 | 4284 |
+| `behaviour_records` | 8 | students, employees | 2 | 47 |
 | `documents` | 21 | students, employees, users | 4 | 556 |
 | `early_warning_signals` | 16 | students, employees, users | 4 | 20 |
 | `student_academic_records` | 14 | students, academic_years, subjects, employees, users | 3 | 1908 |
-| `student_activities` | 9 | students, activities | 2 | 104 |
-| `student_interests` | 4 | students | 2 | 101 |
+| `student_activities` | 9 | students, activities | 2 | 98 |
+| `student_interests` | 4 | students | 2 | 103 |
 | `student_skills` | 9 | students | 2 | 265 |
 | `student_timeline_events` | 9 | students, users | 2 | 70 |
 | `teacher_observations` | 7 | students, employees | 1 | 4 |
@@ -59,17 +59,17 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
-| `boarding_events` | 10 | students, transport_routes, route_stops, employees | 3 | 47 |
+| `boarding_events` | 10 | students, transport_routes, route_stops, employees | 3 | 48 |
 | `counselling_sessions` | 9 | students, employees | 1 | 20 |
 | `emergency_broadcasts` | 9 | campuses, users | 1 | 2 |
-| `gate_events` | 9 | students, campuses | 3 | 529 |
+| `gate_events` | 9 | students, campuses | 3 | 523 |
 | `geofences` | 9 | campuses | 1 | 3 |
 | `incidents` | 15 | campuses, students, employees, users | 2 | 11 |
 | `infirmary_visits` | 10 | students, employees | 2 | 69 |
 | `pickup_authorisations` | 11 | students, parents | 1 | 8 |
 | `route_stops` | 10 | transport_routes | 2 | 29 |
-| `student_locations` | 11 | students | 3 | 2126 |
-| `student_tracking_profiles` | 10 | students, parents | 2 | 68 |
+| `student_locations` | 15 | students, gps_devices | 4 | 1963 |
+| `student_tracking_profiles` | 9 | students, parents | 1 | 68 |
 | `student_transport` | 7 | students, transport_routes, route_stops | 2 | 39 |
 | `transport_routes` | 13 | campuses, vehicles, employees | 2 | 7 |
 | `vehicle_locations` | 8 | vehicles | 2 | 60 |
@@ -93,13 +93,13 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
-| `bank_statement_lines` | 10 | fee_payments | 1 | 35 |
+| `bank_statement_lines` | 10 | fee_payments | 1 | 22 |
 | `budgets` | 8 | academic_years, campuses | 2 | 18 |
 | `concessions` | 13 | students, academic_years, users | 1 | 21 |
-| `expenses` | 16 | campuses, vendors, employees, users | 3 | 164 |
+| `expenses` | 16 | campuses, vendors, employees, users | 3 | 193 |
 | `fee_heads` | 6 | — | 2 | 6 |
-| `fee_payment_allocations` | 3 | fee_payments, student_fees | 1 | 393 |
-| `fee_payments` | 15 | students, parents, users | 4 | 255 |
+| `fee_payment_allocations` | 3 | fee_payments, student_fees | 1 | 400 |
+| `fee_payments` | 15 | students, parents, users | 4 | 254 |
 | `fee_structures` | 11 | academic_years, classes, fee_heads, users | 2 | 159 |
 | `reimbursements` | 13 | employees, users, payroll_runs | 2 | 29 |
 | `scholarships` | 10 | academic_years | 1 | 4 |
@@ -110,30 +110,30 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
 | `allowances` | 9 | employees | 1 | 150 |
-| `cpd_records` | 9 | employees | 2 | 119 |
+| `cpd_records` | 9 | employees | 2 | 121 |
 | `leave_balances` | 6 | employees, leave_types, academic_years | 1 | 160 |
 | `leave_requests` | 15 | employees, leave_types, users | 4 | 73 |
 | `leave_types` | 4 | — | 2 | 4 |
 | `overtime_entries` | 11 | employees, users, payroll_runs | 2 | 43 |
 | `payroll_runs` | 23 | campuses, users | 3 | 12 |
 | `payslips` | 13 | payroll_runs, employees | 3 | 160 |
-| `shift_rosters` | 9 | employees, shifts | 3 | 146 |
+| `shift_rosters` | 9 | employees, shifts | 3 | 145 |
 | `shifts` | 8 | — | 2 | 9 |
-| `staff_attendance` | 9 | employees | 3 | 1520 |
+| `staff_attendance` | 9 | employees | 3 | 1480 |
 
 ### 007_academics_parents_comms.sql
 
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
 | `ai_drafts` | 10 | users | 1 | 6 |
-| `circular_acknowledgements` | 3 | circulars, parents | 2 | 221 |
+| `circular_acknowledgements` | 3 | circulars, parents | 2 | 209 |
 | `circulars` | 19 | campuses, users | 2 | 7 |
 | `communications` | 19 | parents, enquiries, students, users, message_threads | 5 | 265 |
 | `curriculum_stages` | 7 | — | 2 | 5 |
 | `device_tokens` | 6 | users | 2 | 0 |
 | `events` | 16 | campuses, users | 2 | 14 |
 | `homework` | 11 | sections, subjects, employees | 1 | 16 |
-| `homework_submissions` | 5 | homework, students | 1 | 77 |
+| `homework_submissions` | 5 | homework, students | 1 | 74 |
 | `knowledge_documents` | 10 | — | 1 | 8 |
 | `learning_objectives` | 9 | subjects | 2 | 32 |
 | `lesson_plans` | 14 | sections, subjects, learning_objectives, employees, users | 1 | 21 |
@@ -144,7 +144,7 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | `notification_preferences` | 8 | users | 1 | 0 |
 | `notifications` | 13 | users | 3 | 98 |
 | `periods` | 5 | campuses | 2 | 24 |
-| `ptm_bookings` | 8 | ptm_sessions, parents, students | 3 | 40 |
+| `ptm_bookings` | 8 | ptm_sessions, parents, students | 3 | 43 |
 | `ptm_sessions` | 11 | employees, sections | 2 | 6 |
 | `question_bank` | 13 | subjects, users | 1 | 290 |
 | `report_card_batches` | 10 | sections, academic_years, users | 2 | 5 |
@@ -169,7 +169,7 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | `innovation_project_members` | 3 | innovation_projects, students | 1 | 10 |
 | `innovation_projects` | 12 | innovation_ideas, students, employees | 2 | 6 |
 | `inventory_items` | 12 | campuses, vendors | 2 | 15 |
-| `inventory_movements` | 7 | inventory_items, users | 2 | 94 |
+| `inventory_movements` | 7 | inventory_items, users | 2 | 88 |
 | `maintenance_requests` | 15 | campuses, assets, facilities, employees | 2 | 42 |
 | `student_transfers` | 17 | students, campuses, users, sections | 1 | 5 |
 
@@ -206,11 +206,19 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 |---|---|---|---|---|
 | `group_policy_versions` | 11 | group_policies, users | 2 | 6 |
 
+### 110_gps_devices.sql
+
+| Table | Columns | Relations | Indexes | Sample rows |
+|---|---|---|---|---|
+| `device_assignments` | 11 | students, gps_devices, users | 5 | 53 |
+| `gps_devices` | 18 | campuses, users | 6 | 60 |
+| `student_latest_locations` | 15 | students, gps_devices | 1 | 52 |
+
 ### other
 
 | Table | Columns | Relations | Indexes | Sample rows |
 |---|---|---|---|---|
-| `schema_migrations` | 2 | — | 1 | 15 |
+| `schema_migrations` | 2 | — | 1 | 16 |
 
 ## Columns
 
@@ -744,6 +752,24 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 
 </details>
 
+<details><summary><code>device_assignments</code></summary>
+
+| Column | Type | Null | Default / FK |
+|---|---|---|---|
+| id | uuid |  | gen_random_uuid() |
+| student_id | uuid |  | → students |
+| device_id | uuid |  | → gps_devices |
+| status | text |  | 'active'::text |
+| assigned_at | timestamp with time zone |  | now() |
+| assigned_by | uuid | yes | → users |
+| unassigned_at | timestamp with time zone | yes |  |
+| unassigned_by | uuid | yes | → users |
+| unassign_reason | text | yes |  |
+| notes | text | yes |  |
+| created_at | timestamp with time zone |  | now() |
+
+</details>
+
 <details><summary><code>device_tokens</code></summary>
 
 | Column | Type | Null | Default / FK |
@@ -1110,6 +1136,31 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | latitude | numeric |  |  |
 | longitude | numeric |  |  |
 | radius_m | integer |  |  |
+| created_at | timestamp with time zone |  | now() |
+| updated_at | timestamp with time zone |  | now() |
+
+</details>
+
+<details><summary><code>gps_devices</code></summary>
+
+| Column | Type | Null | Default / FK |
+|---|---|---|---|
+| id | uuid |  | gen_random_uuid() |
+| device_code | text |  |  |
+| imei | text | yes |  |
+| serial_number | text | yes |  |
+| device_type | text |  | 'gps_tracker'::text |
+| firmware_version | text | yes |  |
+| campus_id | uuid | yes | → campuses |
+| status | text |  | 'available'::text |
+| token_hash | text | yes |  |
+| token_issued_at | timestamp with time zone | yes |  |
+| last_seen_at | timestamp with time zone | yes |  |
+| last_battery_pct | integer | yes |  |
+| last_ip | text | yes |  |
+| notes | text | yes |  |
+| is_sample_data | boolean |  | false |
+| created_by | uuid | yes | → users |
 | created_at | timestamp with time zone |  | now() |
 | updated_at | timestamp with time zone |  | now() |
 
@@ -2140,6 +2191,28 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 
 </details>
 
+<details><summary><code>student_latest_locations</code></summary>
+
+| Column | Type | Null | Default / FK |
+|---|---|---|---|
+| student_id | uuid |  | → students |
+| location_id | bigint |  |  |
+| device_id | uuid | yes | → gps_devices |
+| latitude | numeric |  |  |
+| longitude | numeric |  |  |
+| accuracy | numeric | yes |  |
+| altitude | numeric | yes |  |
+| speed | numeric | yes |  |
+| heading | numeric | yes |  |
+| location_status | text |  |  |
+| place_label | text | yes |  |
+| source | text |  |  |
+| battery_pct | integer | yes |  |
+| recorded_at | timestamp with time zone |  |  |
+| updated_at | timestamp with time zone |  | now() |
+
+</details>
+
 <details><summary><code>student_locations</code></summary>
 
 | Column | Type | Null | Default / FK |
@@ -2155,6 +2228,10 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | battery_pct | integer | yes |  |
 | recorded_at | timestamp with time zone |  |  |
 | created_at | timestamp with time zone |  | now() |
+| device_id | uuid | yes | → gps_devices |
+| altitude | numeric | yes |  |
+| speed | numeric | yes |  |
+| heading | numeric | yes |  |
 
 </details>
 
@@ -2198,7 +2275,6 @@ Migrations run in file-name order and are tracked in `schema_migrations`.
 | tracking_enabled | boolean |  | true |
 | tracking_status | text |  | 'active'::text |
 | device_type | text |  | 'id_card_tag'::text |
-| device_id | text | yes |  |
 | consent_given_by | uuid | yes | → parents |
 | consent_given_at | timestamp with time zone | yes |  |
 | is_sample_data | boolean |  | false |

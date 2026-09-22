@@ -6,6 +6,7 @@ import { Avatar, Badge, Button, Card, Dl, Empty, ErrorState, Grid, Icon, Segment
 import { HistoryMap, StudentMap } from '@/components/map/StudentMap';
 import { fmt, todayKey } from '@/lib/format';
 import { statusTone } from '@/lib/tones';
+import { AssignDeviceModal, GpsStatusBadge, useUnassign } from './devices';
 
 const STATUS_DOT: Record<string, string> = {
   'Tracking Active': 'success',
@@ -99,6 +100,8 @@ export function TrackingPanel({
                 ['Latitude', <span key="la" className="coord">{hasPoint ? Number(loc.latitude).toFixed(4) : '—'}</span>],
                 ['Longitude', <span key="lo" className="coord">{hasPoint ? Number(loc.longitude).toFixed(4) : '—'}</span>],
                 ['Accuracy', loc.accuracy != null ? `± ${Math.round(loc.accuracy)} m` : '—'],
+                ['GPS Device', loc.deviceCode ? <span key="d" className="row g-2"><span className="coord t-bold">{loc.deviceCode}</span><GpsStatusBadge status={loc.gpsStatus} seenAt={loc.deviceLastSeenAt} /></span> : <span key="d" className="t-muted">No device assigned</span>],
+                ...(loc.speed != null ? [['Speed', `${(loc.speed * 3.6).toFixed(1)} km/h`] as [string, string]] : []),
                 ['Last Updated', loc.recordedAt ? <span key="u"><strong>{fmt.time(loc.recordedAt)}</strong> <span className="t-muted">· {fmt.date(loc.recordedAt)}</span></span> : '—'],
                 ['Device battery', loc.batteryPct != null ? `${loc.batteryPct}%` : '—'],
               ]}
@@ -131,6 +134,8 @@ function deviceLabel(d: string | null) {
 
 function TrackingControls({ loc, onChanged }: { loc: CurrentLocation; onChanged: () => void }) {
   const confirm = useConfirm();
+  const [assigning, setAssigning] = useState(false);
+  const unassign = useUnassign(onChanged);
   const save = useApiMutation<{ trackingEnabled?: boolean; trackingStatus?: string }>('patch', `/tracking/students/${loc.studentId}/profile`, {
     invalidate: ['/tracking', `/students/${loc.studentId}`],
     success: 'Tracking settings updated',
@@ -138,7 +143,24 @@ function TrackingControls({ loc, onChanged }: { loc: CurrentLocation; onChanged:
   });
   return (
     <div className="col g-2" style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 'var(--s-3)' }}>
-      <div className="eyebrow">Tracking settings</div>
+      <div className="eyebrow">GPS device</div>
+      <div className="row g-2 wrap">
+        <Button size="sm" icon="qr" variant={loc.deviceCode ? undefined : 'teal'} onClick={() => setAssigning(true)}>
+          {loc.deviceCode ? 'Replace device' : 'Assign device (scan QR)'}
+        </Button>
+        {loc.assignmentId && (
+          <Button size="sm" icon="x" loading={unassign.pending}
+            onClick={() => unassign.run({ id: loc.assignmentId!, deviceCode: loc.deviceCode!, admissionNo: loc.admissionNo, studentName: loc.fullName })}>
+            Unassign {loc.deviceCode}
+          </Button>
+        )}
+      </div>
+      {assigning && (
+        <AssignDeviceModal
+          student={{ id: loc.studentId, admissionNo: loc.admissionNo, fullName: loc.fullName, grade: loc.grade, section: loc.section }}
+          onClose={() => setAssigning(false)} onDone={onChanged} />
+      )}
+      <div className="eyebrow mt-2">Tracking settings</div>
       <Switch
         label={loc.trackingEnabled ? 'Tracking enabled' : 'Tracking disabled'}
         checked={loc.trackingEnabled}
@@ -221,7 +243,7 @@ export function LocationHistory({ path, note, campus }: { path: string; note?: s
                       <span className="t-sm t-bold t-num">{fmt.time(p.recordedAt)}</span>
                       <span className="col" style={{ minWidth: 0 }}>
                         <span className="coord t-xs">{Number(p.latitude).toFixed(4)}, {Number(p.longitude).toFixed(4)}</span>
-                        <span className="t-micro t-muted t-clip">{p.placeLabel ?? '—'} · {p.source}</span>
+                        <span className="t-micro t-muted t-clip">{[p.placeLabel ?? '—', p.deviceCode ?? p.source, p.accuracy != null ? `± ${Math.round(p.accuracy)} m` : null, p.speed != null ? `${(p.speed * 3.6).toFixed(0)} km/h` : null].filter(Boolean).join(' · ')}</span>
                       </span>
                       <Badge tone={p.locationStatus === 'at_school' ? 'success' : p.locationStatus === 'in_transit' ? 'warning' : p.locationStatus === 'on_trip' ? 'info' : 'neutral'}>
                         {p.locationStatusLabel}

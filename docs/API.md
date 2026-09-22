@@ -84,8 +84,21 @@ Use `user.permissions` to decide which screens to show; the API enforces the sam
 
 ## GPS devices and integrations
 
-Create a dedicated user whose role holds only `tracking.write` (Administration → Users & Roles,
-e.g. a custom "Tracking Device" role), sign in with `clientType: "integration"`, and post:
+Every GPS device (Android tracker app or hardware) posts to **one** endpoint with its own device
+token — not a user session. The student is resolved from the device's active assignment:
+
+```http
+POST /api/v1/location
+Authorization: Bearer hsd_…
+
+{ "device_id": "GPS000123", "latitude": 11.0168, "longitude": 76.9558, "accuracy": 7.4, "battery_level": 87, "recorded_at": "2026-09-22T06:00:00Z" }
+```
+
+Devices are registered and assigned through `/api/devices` and `/api/device-assignments`
+(`tracking.manage`). Full contract, status codes and firmware notes: [GPS-DEVICES.md](GPS-DEVICES.md).
+
+Integrations that already know the student (manual entry, a bus unit posting for its riders) can
+still use a service user holding only `tracking.write`, signed in with `clientType: "integration"`:
 
 ```http
 POST /api/students/HS-2026-1041/location

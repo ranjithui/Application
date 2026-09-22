@@ -43,7 +43,8 @@ export class ApiError extends Error {
   /** Field → message map for form validation errors. */
   get fieldErrors(): Record<string, string> {
     const out: Record<string, string> = {};
-    for (const d of this.details ?? []) if (d.field && !out[d.field]) out[d.field] = d.message;
+    // Some errors carry a details object (e.g. who holds a device), not field errors.
+    for (const d of Array.isArray(this.details) ? this.details : []) if (d.field && !out[d.field]) out[d.field] = d.message;
     return out;
   }
 }

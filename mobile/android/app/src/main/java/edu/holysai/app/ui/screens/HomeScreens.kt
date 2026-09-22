@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalTime
 
 @Composable
-fun LoginScreen(onSignedIn: (User) -> Unit) {
+fun LoginScreen(onSignedIn: (User) -> Unit, onTracker: () -> Unit = {}) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var server by remember { mutableStateOf(Session.baseUrl) }
@@ -151,6 +151,8 @@ fun LoginScreen(onSignedIn: (User) -> Unit) {
                 }
             }
         }
+        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = onTracker) { Text("Use this phone as a GPS tracker", color = Gold) }
     }
 }
 

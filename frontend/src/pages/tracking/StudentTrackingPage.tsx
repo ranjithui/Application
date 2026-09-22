@@ -11,6 +11,7 @@ import {
 } from '@/components/ui';
 import { StudentMap } from '@/components/map/StudentMap';
 import { TrackingPanel, TrackingStatusPill } from '@/components/tracking/TrackingPanel';
+import { GpsStatusBadge } from '@/components/tracking/devices';
 import type { CurrentLocation, TrackingMapData } from '@/api/types';
 import { fmt } from '@/lib/format';
 
@@ -67,6 +68,7 @@ function TrackingOverview() {
             {map.data && <span className="illustrative"><span className="dot dot--success dot--pulse" />Refreshed {fmt.time(map.data.generatedAt)}</span>}
             <Segment items={[{ id: 'split', label: 'Map + list' }, { id: 'map', label: 'Map' }, { id: 'list', label: 'List' }]} active={view} onChange={setView} />
             <Button icon="refresh" onClick={() => { map.refetch(); rows.refetch(); }} loading={map.isFetching}>Refresh</Button>
+            {(can('tracking.read_all') || can('tracking.manage')) && <Button icon="navigation" to="/gps-devices">GPS Devices</Button>}
           </>
         }
       />
@@ -132,6 +134,7 @@ function TrackingOverview() {
                   { key: 'grade', label: 'Class', render: (r) => `${r.grade ?? '—'}${r.section ?? ''}` },
                   { key: 'status', label: 'Status', render: (r) => <TrackingStatusPill status={r.displayStatus} /> },
                   ...(view === 'list' ? [
+                    { key: 'device', label: 'Device', sortable: false, render: (r: CurrentLocation) => (r.deviceCode ? <span className="col g-1"><span className="coord t-xs t-bold">{r.deviceCode}</span><GpsStatusBadge status={r.gpsStatus} seenAt={r.deviceLastSeenAt} /></span> : <span className="t-faint">No device</span>) },
                     { key: 'location', label: 'Location', sortable: false, render: (r: CurrentLocation) => (r.latitude != null ? <span>{r.placeLabel ?? r.locationStatusLabel}<div className="coord t-micro">{fmt.coord(r.latitude)}, {fmt.coord(r.longitude)}</div></span> : '—') },
                   ] : []),
                   { key: 'updated', label: 'Last Updated', render: (r) => (r.recordedAt ? <span title={fmt.dateTime(r.recordedAt)}>{fmt.relative(r.recordedAt)}</span> : '—') },

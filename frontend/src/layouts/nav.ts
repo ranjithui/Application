@@ -25,6 +25,7 @@ export interface NavGroup {
 
 const STAFF_STUDENTS = ['students.read', 'students.read_assigned'];
 const STAFF_TRACK = ['tracking.read_all', 'tracking.read_assigned'];
+const DEVICES = ['tracking.read_all', 'tracking.manage'];
 
 export const NAV: NavGroup[] = [
   {
@@ -98,6 +99,8 @@ export const NAV: NavGroup[] = [
       { label: 'Pickup Authorisation', icon: 'key', to: '/pickup', perm: ['safety.read'] },
       { label: 'Visitor Management', icon: 'idCard', to: '/visitors', perm: ['safety.read'] },
       { label: 'Student Tracking', icon: 'mapPin', to: '/student-tracking', perm: STAFF_TRACK },
+      { label: 'GPS Devices', icon: 'navigation', to: '/gps-devices', perm: DEVICES },
+      { label: 'Device Assignments', icon: 'link', to: '/device-assignments', perm: DEVICES },
       { label: 'Bus Tracking', icon: 'bus', to: '/bus-tracking', perm: ['transport.read'] },
       { label: 'Routes', icon: 'route', to: '/routes', perm: ['transport.read'] },
       { label: 'Boarding/De-boarding', icon: 'navigation', to: '/boarding', perm: ['transport.read'] },

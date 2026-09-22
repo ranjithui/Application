@@ -6,10 +6,25 @@ import { badRequest, notFound } from '../utils/errors.js';
 import { studentScope } from './access.service.js';
 import { notifyGuardians } from './notification.service.js';
 import { audit } from './audit.service.js';
+import { env } from '../config/env.js';
 import type { AuthUser } from '../types.js';
+import type { Queryable } from '../config/db.js';
 
 /** A location older than this is shown as "last known" rather than live. */
 export const STALE_AFTER_MINUTES = 30;
+
+export type GpsStatus = 'online' | 'stale' | 'offline' | 'never';
+
+/**
+ * Device connectivity from its last contact: ONLINE below ONLINE_THRESHOLD_SECONDS,
+ * STALE up to OFFLINE_THRESHOLD_SECONDS, OFFLINE after that (both configurable).
+ */
+export function gpsStatusSql(col: string) {
+  return `CASE WHEN ${col} IS NULL THEN 'never'
+               WHEN ${col} >= now() - make_interval(secs => ${Number(env.ONLINE_THRESHOLD_SECONDS)}) THEN 'online'
+               WHEN ${col} >= now() - make_interval(secs => ${Number(env.OFFLINE_THRESHOLD_SECONDS)}) THEN 'stale'
+               ELSE 'offline' END`;
+}
 
 export type LocationStatus = 'at_home' | 'in_transit' | 'at_school' | 'on_trip' | 'unknown';
 
@@ -41,13 +56,18 @@ const CURRENT_SQL = `
          l.location_id AS "locationId", l.latitude, l.longitude, l.accuracy,
          l.location_status AS "locationStatus", l.place_label AS "placeLabel", l.source,
          l.battery_pct AS "batteryPct", l.recorded_at AS "recordedAt",
-         (l.recorded_at IS NULL OR l.recorded_at < now() - make_interval(mins => ${STALE_AFTER_MINUTES})) AS "isStale"
+         l.speed, l.heading, l.altitude,
+         (l.recorded_at IS NULL OR l.recorded_at < now() - make_interval(mins => ${STALE_AFTER_MINUTES})) AS "isStale",
+         d.id AS "deviceId", d.device_code AS "deviceCode", d.last_seen_at AS "deviceLastSeenAt", da.id AS "assignmentId",
+         ${gpsStatusSql('d.last_seen_at')} AS "gpsStatus"
     FROM students s
     JOIN campuses cp ON cp.id = s.campus_id
     LEFT JOIN sections sec ON sec.id = s.section_id
     LEFT JOIN classes c ON c.id = sec.class_id
     LEFT JOIN student_tracking_profiles tp ON tp.student_id = s.id
-    LEFT JOIN student_current_locations l ON l.student_id = s.id`;
+    LEFT JOIN student_current_locations l ON l.student_id = s.id
+    LEFT JOIN device_assignments da ON da.student_id = s.id AND da.status = 'active'
+    LEFT JOIN gps_devices d ON d.id = da.device_id`;
 
 export async function getCurrentLocation(studentId: string) {
   const row = await one(`${CURRENT_SQL} WHERE s.id = $1 AND s.deleted_at IS NULL`, [studentId]);
@@ -94,8 +114,9 @@ export async function getHistory(studentId: string, f: HistoryFilters, opts: { m
   const points = await many(
     `SELECT * FROM (
        SELECT l.id, l.latitude, l.longitude, l.accuracy, l.location_status AS "locationStatus",
-              l.place_label AS "placeLabel", l.source, l.battery_pct AS "batteryPct", l.recorded_at AS "recordedAt"
-         FROM student_locations l ${w.sql}
+              l.place_label AS "placeLabel", l.source, l.battery_pct AS "batteryPct", l.recorded_at AS "recordedAt",
+              l.speed, l.heading, l.altitude, d.device_code AS "deviceCode"
+         FROM student_locations l LEFT JOIN gps_devices d ON d.id = l.device_id ${w.sql}
         ORDER BY l.recorded_at DESC LIMIT ${w.param(limit)}) x
       ORDER BY x."recordedAt" ASC`,
     w.params,
@@ -144,6 +165,9 @@ export interface LocationInput {
   latitude: number;
   longitude: number;
   accuracy?: number;
+  altitude?: number;
+  speed?: number;
+  heading?: number;
   locationStatus?: LocationStatus;
   placeLabel?: string;
   source?: 'device' | 'bus' | 'gate' | 'manual' | 'sample';
@@ -151,60 +175,90 @@ export interface LocationInput {
   recordedAt?: string;
 }
 
-export async function recordLocation(req: Request, studentId: string, input: LocationInput) {
-  const recordedAt = input.recordedAt ? new Date(input.recordedAt) : new Date();
-  if (recordedAt.getTime() > Date.now() + 5 * 60_000) throw badRequest('recordedAt cannot be in the future', 'INVALID_TIMESTAMP');
+/** Rejects timestamps too far in the future (clock drift) or too old to be useful. */
+export function checkRecordedAt(recordedAt: Date) {
+  if (Number.isNaN(recordedAt.getTime())) throw badRequest('recordedAt is not a valid timestamp', 'INVALID_TIMESTAMP');
+  if (recordedAt.getTime() > Date.now() + env.LOCATION_MAX_FUTURE_SECONDS * 1000) {
+    throw badRequest('recordedAt cannot be in the future', 'INVALID_TIMESTAMP');
+  }
+  if (recordedAt.getTime() < Date.now() - env.LOCATION_MAX_AGE_HOURS * 3_600_000) {
+    throw badRequest(`recordedAt is older than ${env.LOCATION_MAX_AGE_HOURS} hours`, 'TIMESTAMP_TOO_OLD');
+  }
+}
 
+/** Tracking must be switched on for the student before any point is stored. */
+export async function trackingAllowed(studentId: string, db?: Queryable) {
   const profile = await one<{ tracking_enabled: boolean; tracking_status: string }>(
     'SELECT tracking_enabled, tracking_status FROM student_tracking_profiles WHERE student_id = $1',
-    [studentId],
+    [studentId], db,
   );
-  if (!profile || !profile.tracking_enabled || profile.tracking_status === 'disabled') {
-    throw badRequest('Tracking is not enabled for this student', 'TRACKING_DISABLED');
-  }
+  return !!profile && profile.tracking_enabled && profile.tracking_status !== 'disabled';
+}
 
+/**
+ * Stores one point inside the caller's transaction: classifies it against the
+ * geofences, appends it to the history (a trigger maintains the latest-location
+ * table), brings an 'offline' profile back to 'active' and tells guardians about
+ * campus arrivals and departures. Callers check tracking consent first.
+ */
+export async function storeLocation(db: Queryable, studentId: string, input: LocationInput & { deviceId?: string | null }, recordedAt: Date) {
   const auto = input.locationStatus ? null : await classify(studentId, input.latitude, input.longitude);
   const status = input.locationStatus ?? auto!.status;
   const label = input.placeLabel ?? auto?.label ?? null;
 
-  return tx(async (db) => {
-    const prev = await one<{ location_status: LocationStatus }>(
-      'SELECT location_status FROM student_current_locations WHERE student_id = $1',
-      [studentId], db,
-    );
-    const row = await one(
-      `INSERT INTO student_locations (student_id, latitude, longitude, accuracy, location_status, place_label, source, battery_pct, recorded_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       RETURNING id, latitude, longitude, accuracy, location_status AS "locationStatus", place_label AS "placeLabel",
-                 source, battery_pct AS "batteryPct", recorded_at AS "recordedAt"`,
-      [studentId, input.latitude, input.longitude, input.accuracy ?? null, status, label, input.source ?? 'device', input.batteryPct ?? null, recordedAt],
-      db,
-    );
-    await query(
-      `UPDATE student_tracking_profiles SET tracking_status = 'active' WHERE student_id = $1 AND tracking_status = 'offline'`,
-      [studentId], db,
-    );
+  const prev = await one<{ location_status: LocationStatus; recorded_at: Date }>(
+    'SELECT location_status, recorded_at FROM student_latest_locations WHERE student_id = $1',
+    [studentId], db,
+  );
+  const row = await one(
+    `INSERT INTO student_locations (student_id, device_id, latitude, longitude, accuracy, altitude, speed, heading,
+                                    location_status, place_label, source, battery_pct, recorded_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     RETURNING id, latitude, longitude, accuracy, altitude, speed, heading, location_status AS "locationStatus",
+               place_label AS "placeLabel", source, battery_pct AS "batteryPct", recorded_at AS "recordedAt"`,
+    [studentId, input.deviceId ?? null, input.latitude, input.longitude, input.accuracy ?? null, input.altitude ?? null,
+      input.speed ?? null, input.heading ?? null, status, label, input.source ?? 'device',
+      input.batteryPct != null ? Math.round(input.batteryPct) : null, recordedAt],
+    db,
+  );
+  await query(
+    `UPDATE student_tracking_profiles SET tracking_status = 'active' WHERE student_id = $1 AND tracking_status = 'offline'`,
+    [studentId], db,
+  );
 
-    // Parents hear about arrivals and departures, not every GPS ping.
-    if (prev && prev.location_status !== status && (status === 'at_school' || prev.location_status === 'at_school')) {
-      const s = await one<{ full_name: string }>('SELECT full_name FROM students WHERE id = $1', [studentId], db);
-      const arrived = status === 'at_school';
-      await notifyGuardians(studentId, {
-        category: arrived ? 'Completed' : 'Information',
-        icon: arrived ? 'shieldCheck' : 'mapPin',
-        topic: 'tracking',
-        title: arrived ? `${s!.full_name} reached the school campus` : `${s!.full_name} has left the school campus`,
-        body: `Location updated at ${recordedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`,
-        route: `/parent-360/track/${studentId}`,
-        entityType: 'student',
-        entityId: studentId,
-      }, db);
-    }
+  // Parents hear about arrivals and departures, not every GPS ping — and not
+  // about buffered points that arrive later than a newer one.
+  const isNewest = !prev || recordedAt >= prev.recorded_at;
+  if (prev && isNewest && prev.location_status !== status && (status === 'at_school' || prev.location_status === 'at_school')) {
+    const s = await one<{ full_name: string }>('SELECT full_name FROM students WHERE id = $1', [studentId], db);
+    const arrived = status === 'at_school';
+    await notifyGuardians(studentId, {
+      category: arrived ? 'Completed' : 'Information',
+      icon: arrived ? 'shieldCheck' : 'mapPin',
+      topic: 'tracking',
+      title: arrived ? `${s!.full_name} reached the school campus` : `${s!.full_name} has left the school campus`,
+      body: `Location updated at ${recordedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`,
+      route: `/parent-360/track/${studentId}`,
+      entityType: 'student',
+      entityId: studentId,
+    }, db);
+  }
+  return { ...row, locationStatusLabel: LOCATION_STATUS_LABEL[status] };
+}
+
+/** Manual / integration recording by a signed-in account holding tracking.write. */
+export async function recordLocation(req: Request, studentId: string, input: LocationInput) {
+  const recordedAt = input.recordedAt ? new Date(input.recordedAt) : new Date();
+  checkRecordedAt(recordedAt);
+  if (!(await trackingAllowed(studentId))) throw badRequest('Tracking is not enabled for this student', 'TRACKING_DISABLED');
+
+  return tx(async (db) => {
+    const row = await storeLocation(db, studentId, input, recordedAt);
     await audit(req, {
       action: 'create', module: 'tracking', description: 'Recorded student location',
-      entityType: 'student', entityId: studentId, metadata: { status, source: input.source ?? 'device' },
+      entityType: 'student', entityId: studentId, metadata: { status: row.locationStatus, source: input.source ?? 'device' },
     }, db);
-    return { ...row, locationStatusLabel: LOCATION_STATUS_LABEL[status] };
+    return row;
   });
 }
 
@@ -264,6 +318,7 @@ export async function mapData(user: AuthUser, f: Partial<TrackingFilters>) {
       studentId: r.studentId, admissionNo: r.admissionNo, fullName: r.fullName, grade: r.grade, section: r.section,
       latitude: r.latitude, longitude: r.longitude, accuracy: r.accuracy, locationStatus: r.locationStatus,
       locationStatusLabel: r.locationStatusLabel, displayStatus: r.displayStatus, recordedAt: r.recordedAt, isStale: r.isStale,
+      placeLabel: r.placeLabel, batteryPct: r.batteryPct, speed: r.speed, deviceCode: r.deviceCode, gpsStatus: r.gpsStatus,
     }));
   const campuses = await many(
     `SELECT c.id, c.code, c.name, c.short_name AS "shortName", c.latitude, c.longitude, g.radius_m AS "radiusM"
@@ -281,19 +336,22 @@ export async function mapData(user: AuthUser, f: Partial<TrackingFilters>) {
     inTransit: rows.filter((r) => r.locationStatus === 'in_transit' && !r.isStale).length,
     atHome: rows.filter((r) => r.locationStatus === 'at_home' && !r.isStale).length,
   };
-  return { markers, campuses, summary, staleAfterMinutes: STALE_AFTER_MINUTES, generatedAt: new Date().toISOString() };
+  return {
+    markers, campuses, summary, staleAfterMinutes: STALE_AFTER_MINUTES,
+    gpsThresholds: { onlineSeconds: env.ONLINE_THRESHOLD_SECONDS, offlineSeconds: env.OFFLINE_THRESHOLD_SECONDS },
+    generatedAt: new Date().toISOString(),
+  };
 }
 
-export async function updateTrackingProfile(req: Request, studentId: string, input: { trackingEnabled?: boolean; trackingStatus?: string; deviceId?: string | null }) {
+export async function updateTrackingProfile(req: Request, studentId: string, input: { trackingEnabled?: boolean; trackingStatus?: string }) {
   const row = await one(
-    `INSERT INTO student_tracking_profiles (student_id, tracking_enabled, tracking_status, device_id)
-     VALUES ($1, COALESCE($2, true), COALESCE($3, 'active'), $4)
+    `INSERT INTO student_tracking_profiles (student_id, tracking_enabled, tracking_status)
+     VALUES ($1, COALESCE($2, true), COALESCE($3, 'active'))
      ON CONFLICT (student_id) DO UPDATE SET
        tracking_enabled = COALESCE($2, student_tracking_profiles.tracking_enabled),
-       tracking_status  = COALESCE($3, CASE WHEN $2 = false THEN 'disabled' WHEN $2 = true AND student_tracking_profiles.tracking_status = 'disabled' THEN 'active' ELSE student_tracking_profiles.tracking_status END),
-       device_id        = COALESCE($4, student_tracking_profiles.device_id)
-     RETURNING tracking_enabled AS "trackingEnabled", tracking_status AS "trackingStatus", device_id AS "deviceId"`,
-    [studentId, input.trackingEnabled ?? null, input.trackingStatus ?? null, input.deviceId ?? null],
+       tracking_status  = COALESCE($3, CASE WHEN $2 = false THEN 'disabled' WHEN $2 = true AND student_tracking_profiles.tracking_status = 'disabled' THEN 'active' ELSE student_tracking_profiles.tracking_status END)
+     RETURNING tracking_enabled AS "trackingEnabled", tracking_status AS "trackingStatus"`,
+    [studentId, input.trackingEnabled ?? null, input.trackingStatus ?? null],
   );
   await audit(req, {
     action: 'update', module: 'tracking',

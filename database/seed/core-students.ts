@@ -532,10 +532,24 @@ async function seedTracking(db: Db, ctx: SeedContext) {
   const nowMs = ctx.now.getTime();
   const isSchoolDay = ctx.schoolDays(ctx.today, ctx.today).length > 0;
 
+  // Every tracked student carries an ID-card GPS tag (GPS00 + admission suffix);
+  // a few spare tags sit in the store and one is away for repair.
+  const tagRows = ctx.students.map((s) => [`GPS00${s.admissionNo.slice(-4)}`, `864521${s.admissionNo.slice(-4).padStart(9, '0')}`, `HS-TAG-${s.admissionNo.slice(-4)}`,
+    'id_card_tag', '1.4.2', ctx.campuses[s.campusCode].id, 'assigned', true]);
+  const spareCampus = ctx.campuses[ctx.students[0].campusCode].id;
+  for (let i = 1; i <= 6; i++) tagRows.push([`GPS00900${i}`, `864521${String(9000 + i).padStart(9, '0')}`, `HS-TAG-900${i}`, 'id_card_tag', '1.4.2', spareCampus, 'available', true]);
+  tagRows.push(['GPS009007', `864521${String(9007).padStart(9, '0')}`, 'HS-TAG-9007', 'id_card_tag', '1.3.9', spareCampus, 'maintenance', true]);
+  const tags = await bulkInsert(db, 'gps_devices',
+    ['device_code', 'imei', 'serial_number', 'device_type', 'firmware_version', 'campus_id', 'status', 'is_sample_data'], tagRows, 'RETURNING id, device_code');
+  const tagFor = new Map(tags.map((t) => [t.device_code as string, t.id as string]));
+  await bulkInsert(db, 'device_assignments', ['student_id', 'device_id', 'assigned_at', 'notes'],
+    ctx.students.map((s) => [s.id, tagFor.get(`GPS00${s.admissionNo.slice(-4)}`), ctx.at(ctx.yearStart, '10:00'), 'Issued with ID card']));
+
   for (const s of ctx.students) {
     const status = specialStatus[s.admissionNo] ?? 'active';
-    profiles.push([s.id, status !== 'disabled', status, s.routeCode ? 'bus_rfid' : 'id_card_tag', `TAG-${s.admissionNo.slice(-4)}-${ctx.int(100, 999)}`,
-      s.parentId, ctx.at(ctx.yearStart, '10:00'), true]);
+    const deviceId = tagFor.get(`GPS00${s.admissionNo.slice(-4)}`);
+    ctx.int(100, 999); // formerly the tag number; kept so the rest of the seed stays identical
+    profiles.push([s.id, status !== 'disabled', status, s.routeCode ? 'bus_rfid' : 'id_card_tag', s.parentId, ctx.at(ctx.yearStart, '10:00'), true]);
     if (status === 'disabled') continue;
 
     const campus = ctx.campuses[s.campusCode];
@@ -544,7 +558,7 @@ async function seedTracking(db: Db, ctx: SeedContext) {
     const push = (date: string, hhmm: string, p: { lat: number; lng: number }, st: string, label: string | null, source = 'sample') => {
       const t = ctx.at(date, hhmm);
       if (t.getTime() > nowMs) return;
-      locs.push([s.id, p.lat.toFixed(6), p.lng.toFixed(6), acc(), st, label, source, ctx.int(35, 100), t]);
+      locs.push([s.id, source === 'bus' || source === 'gate' ? null : deviceId, p.lat.toFixed(6), p.lng.toFixed(6), acc(), st, label, source, ctx.int(35, 100), t]);
     };
 
     // The brief's example: Aarav Kumar on a field visit in Coimbatore.
@@ -608,9 +622,14 @@ async function seedTracking(db: Db, ctx: SeedContext) {
   }
 
   await bulkInsert(db, 'student_tracking_profiles',
-    ['student_id', 'tracking_enabled', 'tracking_status', 'device_type', 'device_id', 'consent_given_by', 'consent_given_at', 'is_sample_data'], profiles);
+    ['student_id', 'tracking_enabled', 'tracking_status', 'device_type', 'consent_given_by', 'consent_given_at', 'is_sample_data'], profiles);
   await bulkInsert(db, 'student_locations',
-    ['student_id', 'latitude', 'longitude', 'accuracy', 'location_status', 'place_label', 'source', 'battery_pct', 'recorded_at'], locs);
+    ['student_id', 'device_id', 'latitude', 'longitude', 'accuracy', 'location_status', 'place_label', 'source', 'battery_pct', 'recorded_at'], locs);
+  // Each tag was last heard from when it sent its most recent sample point.
+  await db.query(`UPDATE gps_devices d SET last_seen_at = x.recorded_at, last_battery_pct = x.battery_pct
+                    FROM (SELECT DISTINCT ON (device_id) device_id, recorded_at, battery_pct FROM student_locations
+                           WHERE device_id IS NOT NULL ORDER BY device_id, recorded_at DESC) x
+                   WHERE x.device_id = d.id`);
 }
 
 async function seedGateAndBoarding(db: Db, ctx: SeedContext) {
