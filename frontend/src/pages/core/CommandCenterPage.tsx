@@ -78,7 +78,7 @@ export default function CommandCenterPage() {
     <Kpi key="p" label={t('Present Today')} value={fmt.n(presentNow)} unit={a.todayPct != null ? `· ${fmt.pct(a.todayPct, 1)}` : undefined} tone="teal"
       foot={`${fmt.n(a.today.marked)} of ${fmt.n(a.today.total)} marked`} to="/attendance" spark={a.trend.map((x) => x.value)} sparkColor="var(--teal)" />,
     <Kpi key="a" label={t('Absent Today')} value={fmt.n(a.today.absent)} unit={`· ${a.today.late} late`} tone="critical" foot={`${a.repeatAbsentees} absent 3+ days in a row this month`} to="/attendance" />,
-    <Kpi key="st" label={t('Staff Present')} value={`${d.staff.present} / ${d.staff.total}`} tone="info" foot={`${d.staff.absent} absent · ${d.staff.onLeave} on leave`} to={can('hr.read') ? '/staff-attendance' : undefined} />,
+    <Kpi key="st" label={t('Total Staff')} value={fmt.n(d.staff.total)} tone="info" foot={`${d.staff.present} present · ${d.staff.absent} absent · ${d.staff.onLeave} on leave`} to={can('hr.read') ? '/staff-attendance' : undefined} />,
     <Kpi key="tt" label={t('Teaching Staff')} value={fmt.n(d.staff.teaching)} tone="teal"
       foot={`${d.staff.teachingPresent} present today`} to={can('hr.read') ? '/teaching-staff' : undefined} />,
     <Kpi key="nt" label={t('Non-Teaching Staff')} value={fmt.n(d.staff.nonTeaching)} tone="amber"
