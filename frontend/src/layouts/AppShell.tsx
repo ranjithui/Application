@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { useI18n } from '@/i18n/I18nProvider';
@@ -116,14 +116,32 @@ function Sidebar({ rail, onToggleRail, onExpand, counts }: { rail: boolean; onTo
     setOpen(owner === '__pinned__' ? null : owner);
   }, [owner]);
 
+  // Bring the current page's item into view — only after navigating, never when a
+  // section is merely expanded or collapsed (that used to jump the menu to the top).
+  const followRoute = useRef(true);
+  useEffect(() => { followRoute.current = true; }, [current]);
   useEffect(() => {
+    if (!followRoute.current) return;
     const el = listRef.current?.querySelector<HTMLElement>('.navitem[aria-current="page"]');
     const list = listRef.current;
-    if (el && list) {
+    if (el && list && el.offsetParent) {
+      followRoute.current = false;
       const y = el.offsetTop - list.offsetTop;
       if (y < list.scrollTop || y + el.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = Math.max(0, y - list.clientHeight / 3);
     }
   }, [current, open]);
+
+  // Keep a clicked section header at the same place on screen, even when the
+  // section above it collapses as this one opens.
+  const anchor = useRef<{ group: string; top: number } | null>(null);
+  useLayoutEffect(() => {
+    const a = anchor.current;
+    const list = listRef.current;
+    anchor.current = null;
+    if (!a || !list) return;
+    const head = list.querySelector<HTMLElement>(`.navhead[data-group="${CSS.escape(a.group)}"]`);
+    if (head) list.scrollTop += head.getBoundingClientRect().top - a.top;
+  }, [open]);
 
   const ql = q.trim().toLowerCase();
   let matchCount = 0;
@@ -217,9 +235,12 @@ function Sidebar({ rail, onToggleRail, onExpand, counts }: { rail: boolean; onTo
             <div className="navgroup" data-open={String(isOpen)} data-current={owner === g.group ? 'true' : undefined} key={g.group}>
               <button
                 className="navhead"
+                data-group={g.group}
                 aria-expanded={isOpen}
                 title={t(g.group)}
-                onClick={() => {
+                onClick={(e) => {
+                  followRoute.current = false;
+                  anchor.current = { group: g.group, top: e.currentTarget.getBoundingClientRect().top };
                   if (rail) {
                     onExpand();
                     setOpen(g.group);

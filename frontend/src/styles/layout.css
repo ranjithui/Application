@@ -19,7 +19,8 @@
   display: flex; align-items: center; gap: var(--s-3);
   height: var(--topbar-h); padding: 0 var(--s-4) 0 var(--s-5); flex: none;
 }
-.sidebar__brand svg { filter: drop-shadow(0 2px 6px rgba(153, 0, 51, .18)); }
+.sidebar__brand svg,
+.sidebar__brand .brandmark { filter: drop-shadow(0 2px 6px rgba(153, 0, 51, .18)); }
 .sidebar__name {
   font-family: var(--font-brand); font-size: 15px; font-weight: 700;
   color: var(--brand); line-height: 1.1; letter-spacing: .04em;

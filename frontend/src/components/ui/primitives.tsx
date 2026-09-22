@@ -4,7 +4,7 @@
  */
 import { forwardRef, useEffect, useId, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { iconPaths, lotus, brandDivider } from '@/lib/legacy-icons';
+import { iconPaths, brandDivider } from '@/lib/legacy-icons';
 import { charts } from '@/lib/legacy-charts';
 import { cx, fmt } from '@/lib/format';
 import { riskTone, statusTone, toneFor, type Tone } from '@/lib/tones';
@@ -36,8 +36,30 @@ export function Svg({ html, className, style }: { html: string; className?: stri
   return <span className={className} style={{ display: 'contents', ...style }} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+/** School lotus emblem (cropped from the official logo lockup). */
 export function Lotus({ size = 36 }: { size?: number }) {
-  return <Svg html={lotus(size)} />;
+  return (
+    <img
+      src="/logo-mark.png"
+      alt="Holy Sai International School"
+      width={size}
+      height={size}
+      className="brandmark"
+      style={{ width: size, height: size, objectFit: 'contain', flex: 'none' }}
+    />
+  );
+}
+
+/** Full horizontal logo lockup — emblem plus wordmark. */
+export function LogoLockup({ height = 48, className }: { height?: number; className?: string }) {
+  return (
+    <img
+      src="/logo-full.png"
+      alt="Holy Sai International School"
+      className={cx('brandlockup', className)}
+      style={{ height, width: 'auto', objectFit: 'contain', flex: 'none' }}
+    />
+  );
 }
 
 export function BrandDivider() {
