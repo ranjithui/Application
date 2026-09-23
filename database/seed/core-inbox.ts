@@ -18,12 +18,12 @@ const DUE: Record<string, number> = { Today: 0, Overdue: -3, '18 Sep': 1, '19 Se
 
 // [roles, tone, icon, topic, title, meta, time, route, category]
 const N: [string[], string, string, string, string, string, string, string, string][] = [
-  [['management', 'office'], 'critical', 'alert', 'compliance', 'Water quality test overdue by 8 days', 'Compliance · Owner: Murugan P.', '08:05', '/compliance', 'Critical'],
+  [['management'], 'critical', 'alert', 'compliance', 'Water quality test overdue by 8 days', 'Compliance · Owner: Murugan P.', '08:05', '/compliance', 'Critical'],
   [['management', 'teacher'], 'critical', 'userCheck', 'early_warning', 'Students absent 3+ consecutive days', 'Early Warning · Requires teacher review', '08:02', '/early-warning', 'Critical'],
   [['management', 'office', 'staff'], 'warning', 'bus', 'transport', 'Bus 4 running 9 minutes late', 'Transport · Route 4 parents notified automatically', '08:18', '/bus-tracking', 'Attention'],
   [['management', 'office', 'finance'], 'warning', 'wallet', 'fees', 'Fees overdue beyond 30 days', 'Finance · see Fee Collection for accounts', '07:40', '/fees', 'Attention'],
   [['management', 'office'], 'warning', 'users', 'admissions', '3 admissions follow-ups overdue', 'Admissions · Counsellor unassigned on LD-4380', '07:35', '/admissions', 'Attention'],
-  [['management', 'office', 'hr'], 'caution', 'briefcase', 'workforce', 'Substitute needed — Grade 5A Social Studies, Thursday P2', 'Workforce · Ms. Anitha Devi on leave', '07:30', '/timetable', 'Attention'],
+  [['management', 'hr'], 'caution', 'briefcase', 'workforce', 'Substitute needed — Grade 5A Social Studies, Thursday P2', 'Workforce · Ms. Anitha Devi on leave', '07:30', '/timetable', 'Attention'],
   [['management', 'hr', 'finance'], 'caution', 'clipboard', 'payroll', 'Payroll inputs await approval', 'Payroll · current month run', '07:15', '/payroll', 'Attention'],
   [['management', 'teacher'], 'info', 'message', 'communication', 'Parent queries unanswered over 24 h', 'Parent Communication', 'Yesterday', '/parent-communication', 'Information'],
   [['management', 'office', 'teacher'], 'info', 'calendar', 'events', 'PTM booking opens for Grade 5 parents', 'Parent Experience · this weekend', 'Yesterday', '/ptm', 'Information'],
@@ -64,7 +64,7 @@ const T: [string[], string, string, string, string, string, string, string][] = 
   [['management', 'teacher'], 'T-549', 'Review Early Warning signals', 'Early Warning', 'Today', 'High', 'Pending', '/early-warning'],
   [['management'], 'T-546', 'Sign off Grade 6A report cards', 'Report Cards', '24 Sep', 'Medium', 'Pending', '/report-cards'],
   [['management'], 'T-544', 'Approve expense EXP-2211 (AC servicing)', 'Finance', '18 Sep', 'Medium', 'Under Review', '/expenses'],
-  [['management', 'office'], 'T-540', 'Renew water quality test — overdue', 'Compliance', 'Overdue', 'High', 'Pending', '/compliance'],
+  [['management'], 'T-540', 'Renew water quality test — overdue', 'Compliance', 'Overdue', 'High', 'Pending', '/compliance'],
   [['management'], 'T-538', 'Confirm Grade 5 PTM slot plan', 'Parent Experience', '19 Sep', 'Low', 'Pending', '/ptm'],
   [['management'], 'T-537', 'Review student tracking devices that are offline', 'Student Tracking', '19 Sep', 'Low', 'Pending', '/student-tracking'],
   [['teacher'], 'T-533', 'Mark attendance — Grade 5A', 'Attendance', 'Today', 'High', 'Pending', '/attendance'],
@@ -80,7 +80,7 @@ const T: [string[], string, string, string, string, string, string, string][] = 
   [['office'], 'T-511', 'Assign a counsellor to lead LD-4380', 'Admissions', 'Today', 'High', 'Pending', '/leads'],
   [['office'], 'T-510', 'Chase documents for application LD-4405', 'Applications', 'Today', 'Medium', 'Pending', '/applications'],
   [['office'], 'T-509', 'Issue transfer certificate — Rahul Venkatesh', 'Certificates', '18 Sep', 'Medium', 'Under Review', '/certificates'],
-  [['office', 'finance'], 'T-508', 'Clear payment reconciliation exceptions', 'Finance', '18 Sep', 'Medium', 'Pending', '/reconciliation'],
+  [['finance'], 'T-508', 'Clear payment reconciliation exceptions', 'Finance', '18 Sep', 'Medium', 'Pending', '/reconciliation'],
   [['office', 'finance'], 'T-507', 'Send fee reminders to overdue accounts', 'Fees', '19 Sep', 'Low', 'Pending', '/fees'],
   [['staff'], 'T-501', 'Book vehicle fitness — Bus 4 and Bus 15', 'Compliance', '22 Sep', 'High', 'Pending', '/staff-self'],
   [['staff'], 'T-500', 'Submit your overtime claim', 'Overtime', '25 Sep', 'Medium', 'Pending', '/staff-self'],
