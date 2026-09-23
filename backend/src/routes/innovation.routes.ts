@@ -13,6 +13,7 @@ import * as val from '../validators/innovation.validators.js';
 const r = Router();
 const READ = requirePermission('innovation.read');
 const MANAGE = requirePermission('innovation.manage');
+const PORTAL = requirePermission('student_portal.use');
 const id = validate(val.idParam, 'params');
 const pid = (req: Request) => v<{ id: string }>(req, 'params').id;
 
@@ -35,6 +36,14 @@ r.post('/innovation/ideas/:id/review', MANAGE, id, validate(val.ideaReview), asy
 });
 r.post('/innovation/ideas/:id/convert', MANAGE, id, validate(val.ideaConvert), async (req: Request, res: Response) =>
   created(res, await svc.convertIdea(req, pid(req), v(req)), 'Project created from idea'));
+
+// ---- Student portal ----------------------------------------------------------
+// Self-scoped: the student comes from the access token, never from the request,
+// so a student can only ever read or submit their own ideas.
+r.get('/me/ideas', PORTAL, async (req: Request, res: Response) =>
+  ok(res, await svc.listOwnIdeas(req.user!), 'Your ideas'));
+r.post('/me/ideas', PORTAL, validate(val.selfIdeaCreate), async (req: Request, res: Response) =>
+  created(res, await svc.createOwnIdea(req, v(req)), 'Idea submitted for review'));
 
 // ---- Projects ----------------------------------------------------------------
 r.get('/innovation/projects', READ, validate(val.projectListQuery, 'query'), async (req: Request, res: Response) => {

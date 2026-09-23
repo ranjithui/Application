@@ -6,7 +6,7 @@ import type { Request } from 'express';
 import { many, one, query, tx, type Queryable } from '../config/db.js';
 import { Where } from '../utils/sql.js';
 import { likeTerm, limitOffset, orderBy, type Pagination } from '../utils/pagination.js';
-import { badRequest, conflict, notFound } from '../utils/errors.js';
+import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { nextCode } from '../utils/codes.js';
 import { audit } from './audit.service.js';
 import { authorizeStudent, studentScope } from './access.service.js';
@@ -229,6 +229,37 @@ export async function createIdea(req: Request, b: { title: string; problem: stri
     [b.title, b.wantsMentor ? `${b.problem}\n\nMentor: ${b.wantsMentor}` : b.problem, studentId, b.category]);
   await audit(req, { action: 'create', module: MODULE, description: `Submitted idea "${b.title}" for ${r!.name}`, entityType: 'innovation_idea', entityId: r!.id });
   return { id: r!.id };
+}
+
+// ---------------------------------------------------------------------------
+// Student portal (self-service)
+// ---------------------------------------------------------------------------
+/** The student record behind the signed-in account, or a clear error when unlinked. */
+function ownStudentId(user: AuthUser): string {
+  if (!user.studentId) throw forbidden('No student record is linked to this account. Please contact the school office.');
+  return user.studentId;
+}
+
+/**
+ * A student submits their own idea. The student is taken from the access token,
+ * never from the request body, so one student cannot submit as another.
+ */
+export async function createOwnIdea(req: Request, b: { title: string; problem: string; category: string; wantsMentor?: string }) {
+  return createIdea(req, { ...b, studentId: ownStudentId(req.user!) });
+}
+
+/** The signed-in student's own ideas, newest first, with the review outcome. */
+export async function listOwnIdeas(user: AuthUser) {
+  return many(
+    `SELECT i.id, i.title, i.problem, i.category, i.status, i.submitted_on AS "submittedOn",
+            e.full_name AS "reviewedBy",
+            (current_date - i.submitted_on)::int AS "ageDays",
+            p.id AS "projectId", p.code AS "projectCode", p.stage AS "projectStage"
+       FROM innovation_ideas i
+       LEFT JOIN employees e ON e.id = i.reviewed_by
+       LEFT JOIN innovation_projects p ON p.idea_id = i.id
+      WHERE i.student_id = $1
+      ORDER BY i.submitted_on DESC, i.created_at DESC`, [ownStudentId(user)]);
 }
 
 async function loadIdea(user: AuthUser, id: string, db: Queryable) {

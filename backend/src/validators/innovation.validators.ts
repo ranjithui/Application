@@ -30,6 +30,12 @@ export const ideaCreate = z.object({
   category: z.enum(IDEA_AREAS),
   wantsMentor: z.enum(['Yes, please assign one', 'I already have one in mind', 'Not yet']).optional(),
 });
+/**
+ * A student submitting from their own portal. There is deliberately no studentId:
+ * the route resolves it from the access token, so the body cannot name anyone else.
+ */
+export const selfIdeaCreate = ideaCreate.omit({ studentId: true });
+
 export const ideaReview = z.object({
   action: z.enum(['start', 'accept', 'decline']),
   note: optText(500),

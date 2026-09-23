@@ -168,6 +168,8 @@ export const NAV: NavGroup[] = [
   },
   {
     group: 'Innovation', icon: 'rocket', items: [
+      // The student portal's own entry — submit an idea and follow its review.
+      { label: 'My Ideas', icon: 'lightbulb', to: '/my-ideas', perm: ['student_portal.use'] },
       { label: 'Innovation Lab', icon: 'rocket', to: '/innovation', perm: ['innovation.read'] },
       { label: 'Ideas', icon: 'lightbulb', to: '/ideas', perm: ['innovation.read'] },
       { label: 'Projects', icon: 'puzzle', to: '/projects', perm: ['innovation.read'] },
