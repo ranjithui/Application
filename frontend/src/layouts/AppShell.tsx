@@ -23,7 +23,9 @@ function useNavModel() {
     if (!user) return [];
     const home = user.role.homeRoute;
     return NAV.map((g) => {
-      let items = g.items.filter((i) => can(i.perm ?? null) && (!i.roles || i.roles.includes(user.role.key)));
+      let items = g.items.filter((i) => can(i.perm ?? null)
+        && (!i.roles || i.roles.includes(user.role.key))
+        && !i.hideRoles?.includes(user.role.key));
       if (g.group === 'Overview') items = items.filter((i) => i.dynamicHome || pathOf(i.to) !== home);
       // A page listed twice in one group only appears once
       const seen = new Set<string>();

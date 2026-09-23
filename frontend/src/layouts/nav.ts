@@ -15,6 +15,8 @@ export interface NavItem {
   dynamicHome?: boolean;
   /** Show only to these role keys (in addition to permission) */
   roles?: string[];
+  /** Never show to these role keys, even when they hold the permission. */
+  hideRoles?: string[];
 }
 
 export interface NavGroup {
@@ -22,6 +24,14 @@ export interface NavGroup {
   icon: string;
   items: NavItem[];
 }
+
+/**
+ * Personal workspaces that belong to one role's own records. Administrators hold
+ * the permissions (Super Admin holds every permission), but have no employee,
+ * parent or student record behind these screens, so the pages only report that
+ * nothing is linked to the account. Hidden from the menu rather than shown empty.
+ */
+const NOT_FOR_ADMINS = ['super_admin', 'school_admin', 'principal'];
 
 const STAFF_STUDENTS = ['students.read', 'students.read_assigned'];
 const STAFF_TRACK = ['tracking.read_all', 'tracking.read_assigned'];
@@ -32,10 +42,10 @@ export const NAV: NavGroup[] = [
     group: 'Overview', icon: 'grid', items: [
       { label: 'Dashboard', icon: 'home', to: '/command-center', dynamicHome: true },
       { label: 'Command Center', icon: 'pulse', to: '/command-center', perm: ['dashboard.group'] },
-      { label: 'Teacher Dashboard', icon: 'bookOpen', to: '/teacher', perm: ['attendance.mark'] },
-      { label: 'Parent 360', icon: 'heart', to: '/parent-360', perm: ['parent_portal.use'] },
-      { label: 'My Profile', icon: 'user', to: '/my-profile', perm: ['student_portal.use'] },
-      { label: 'Staff Self-Service', icon: 'idCard', to: '/staff-self', perm: ['selfservice.use'] },
+      { label: 'Teacher Dashboard', icon: 'bookOpen', to: '/teacher', perm: ['attendance.mark'], hideRoles: NOT_FOR_ADMINS },
+      { label: 'Parent 360', icon: 'heart', to: '/parent-360', perm: ['parent_portal.use'], hideRoles: NOT_FOR_ADMINS },
+      { label: 'My Profile', icon: 'user', to: '/my-profile', perm: ['student_portal.use'], hideRoles: NOT_FOR_ADMINS },
+      { label: 'Staff Self-Service', icon: 'idCard', to: '/staff-self', perm: ['selfservice.use'], hideRoles: NOT_FOR_ADMINS },
       { label: 'Notifications', icon: 'bell', to: '/notifications', badge: 'alerts', tone: 'alert' },
       { label: 'My Tasks', icon: 'checkSquare', to: '/my-tasks', badge: 'tasks' },
     ],
