@@ -560,6 +560,35 @@
     responses:
       '200': { $ref: '#/components/responses/Ok' }
 
+/reports/{key}/preview:
+  get:
+    tags: [Intelligence]
+    summary: Run a standard report and return it as rows for on-screen review
+    description: >
+      Report Centre preview. Builds the report from the same definition used by the CSV
+      export, then searches, sorts, summarises and pages it, so the export always matches
+      what was reviewed. Returns columns, the requested page of rows, the numeric column
+      keys, KPI aggregates and a chart series. System-group reports (user-access,
+      login-activity, role-permissions, audit-trail, data-quality) are Super Admin only
+      and read as 404 for every other role.
+    x-permission: reports.read (+ report-specific permission)
+    security: [{ bearerAuth: [] }]
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string } }
+      - $ref: '#/components/parameters/CampusId'
+      - { name: date, in: query, schema: { type: string, format: date } }
+      - { name: from, in: query, schema: { type: string, format: date } }
+      - { name: to, in: query, schema: { type: string, format: date } }
+      - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 25 } }
+      - { name: sort, in: query, description: A column key; unknown keys keep the report's natural order, schema: { type: string } }
+      - { name: dir, in: query, schema: { type: string, enum: [asc, desc], default: asc } }
+      - { name: q, in: query, description: Free-text search across every column, schema: { type: string } }
+    responses:
+      '200': { $ref: '#/components/responses/Ok' }
+      '403': { $ref: '#/components/responses/Forbidden' }
+      '404': { $ref: '#/components/responses/NotFound' }
+
 /reports/{key}/export:
   get:
     tags: [Intelligence]
@@ -570,6 +599,8 @@
       curriculum-coverage, report-card-status (academics.read), admissions-funnel (admissions.read),
       fee-collection (finance.read), payroll-cost (payroll.read), compliance-status (operations.read),
       safety-log (safety.read), daily-brief (dashboard.view + students.read), campus-comparison (group.read).
+      Super Admin only — user-access, role-permissions, data-quality (users.manage),
+      login-activity, audit-trail (audit.read).
     x-permission: reports.read (+ report-specific permission)
     security: [{ bearerAuth: [] }]
     parameters:

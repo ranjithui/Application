@@ -8,13 +8,14 @@ import * as people from '../services/intelligence-students.service.js';
 import * as copilot from '../services/intelligence-copilot.service.js';
 import * as knowledge from '../services/intelligence-knowledge.service.js';
 import * as analytics from '../services/intelligence-analytics.service.js';
+import * as reportcentre from '../services/intelligence-reportcenter.service.js';
 import { providerInfo } from '../services/intelligence-provider.js';
 import { STAGES, sendCsv, toCsv, schoolToday } from '../services/intelligence-common.service.js';
 import {
   analyticsQuery, behaviourCreateSchema, campusQuery, checkinCreateSchema, copilotContextQuery, draftCreateSchema,
   draftDiscardSchema, draftListQuery, draftUpdateSchema, ewAdvanceSchema, ewCloseSchema, ewReviewSchema, ewRunCheckSchema,
   ewSignalsQuery, ewStudentsQuery, idParam, knowledgeAskSchema, knowledgeFeedbackSchema, reportExportQuery, reportKeyParam,
-  studentParam, talentDecisionSchema, wellbeingListQuery,
+  reportPreviewQuery, studentParam, talentDecisionSchema, wellbeingListQuery,
 } from '../validators/intelligence.validators.js';
 
 /**
@@ -205,6 +206,13 @@ r.get('/analytics/export', REPORTS, validate(analyticsQuery, 'query'), async (re
 });
 
 r.get('/reports/catalog', REPORTS, (req: Request, res: Response) => ok(res, analytics.reportCatalog(req.user!), 'Report catalogue'));
+
+r.get('/reports/:key/preview', REPORTS, validate(reportKeyParam, 'params'), validate(reportPreviewQuery, 'query'), async (req: Request, res: Response) => {
+  const { key } = v(req, 'params');
+  const { page, pageSize, ...rest } = v(req, 'query');
+  const out = await reportcentre.previewReport(req.user!, key, { page, pageSize, ...rest });
+  return ok(res, out, out.title, { page, pageSize, total: out.matchedRows, totalPages: Math.max(1, Math.ceil(out.matchedRows / pageSize)) });
+});
 
 r.get('/reports/:key/export', REPORTS, validate(reportKeyParam, 'params'), validate(reportExportQuery, 'query'), async (req: Request, res: Response) => {
   const { key } = v(req, 'params');

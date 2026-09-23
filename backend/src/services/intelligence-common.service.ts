@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import { one, type Queryable } from '../config/db.js';
+import type { Permission } from '../config/rbac.js';
 import type { AuthUser } from '../types.js';
 
 /** Reads a numeric system setting, falling back to a default when it is missing or malformed. */
@@ -65,3 +66,52 @@ export function sendCsv(res: Response, filename: string, csv: string) {
 export function schoolToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 }
+
+// ---------------------------------------------------------------------------
+// Standard report registry
+// ---------------------------------------------------------------------------
+// Shared by the report catalogue, the CSV export and the Report Centre preview,
+// so a report is defined once and every surface stays in step.
+
+export interface ReportParams { campusId?: string; date?: string; from?: string; to?: string }
+
+/** The filters a report actually reads, so the UI only offers inputs that apply. */
+export type ReportFilter = 'campus' | 'date' | 'range';
+
+/** Aggregate shown as a KPI tile above a previewed report. */
+export interface ReportSummaryDef {
+  key: string;
+  label: string;
+  agg: 'sum' | 'avg' | 'max' | 'min' | 'count';
+  /** With agg 'count', counts only rows whose `key` equals this value. */
+  equals?: string;
+  unit?: string;
+  tone?: 'teal' | 'amber' | 'critical' | 'info';
+}
+
+/**
+ * Chart shown above a previewed report. 'value' plots a numeric column by label;
+ * 'count' plots how often each value of a categorical column occurs.
+ */
+export type ReportChartDef =
+  | { mode: 'value'; labelKey: string; valueKey: string; label: string }
+  | { mode: 'count'; labelKey: string; label: string };
+
+export interface ReportDef {
+  key: string;
+  group: string;
+  title: string;
+  description: string;
+  /** The caller needs any one of these. */
+  perms: Permission[];
+  /** …and all of these. */
+  alsoRequires?: Permission[];
+  /** When set, only these role keys may run the report, whatever their permissions. */
+  roles?: string[];
+  filters?: ReportFilter[];
+  summary?: ReportSummaryDef[];
+  chart?: ReportChartDef;
+  build: (user: AuthUser, p: ReportParams) => Promise<{ columns: CsvColumn[]; rows: Record<string, unknown>[] }>;
+}
+
+export const col = (key: string, label: string): CsvColumn => ({ key, label });

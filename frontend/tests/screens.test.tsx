@@ -68,6 +68,7 @@ async function paramValues(token: string) {
 
 function resolvePath(path: string, p: Awaited<ReturnType<typeof paramValues>>, role: string) {
   return path
+    .replace('/admin/reports/:key', '/admin/reports/attendance-daily')
     .replace('/projects/:id', p.projectId ? `/projects/${p.projectId}` : '/projects/__missing__')
     .replace('/staff-self/payslips/:id', role === 'staff' ? '/staff-self' : '/staff-self')
     .replace('/payslips/:id', p.payslipId ? `/payslips/${p.payslipId}` : '/payslips')

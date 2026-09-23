@@ -5,7 +5,11 @@ import { forbidden, notFound } from '../utils/errors.js';
 import type { AuthUser } from '../types.js';
 import { studentScope } from './access.service.js';
 import { STUDENT_ROW_SQL } from './students.service.js';
-import { INTERVENTION_SQL, STAGES, schoolToday, type CsvColumn } from './intelligence-common.service.js';
+import {
+  INTERVENTION_SQL, STAGES, col, schoolToday,
+  type CsvColumn, type ReportDef, type ReportParams,
+} from './intelligence-common.service.js';
+import { SYSTEM_REPORTS } from './intelligence-systemreports.service.js';
 
 /**
  * Analytics and standard reports. Every figure is computed from live tables; student
@@ -248,20 +252,21 @@ export async function analytics(user: AuthUser, area: string, campusId?: string)
 // =============================================================================
 // Standard reports (CSV)
 // =============================================================================
-interface ReportParams { campusId?: string; date?: string; from?: string; to?: string }
-interface ReportDef {
-  key: string; group: string; title: string; description: string;
-  perms: Permission[]; // any of
-  alsoRequires?: Permission[]; // and all of
-  build: (user: AuthUser, p: ReportParams) => Promise<{ columns: CsvColumn[]; rows: Record<string, unknown>[] }>;
-}
+// `ReportDef`, `ReportParams` and `col` live in intelligence-common.service.ts so the
+// catalogue, the CSV export and the Report Centre preview all read one definition.
 
-const col = (key: string, label: string): CsvColumn => ({ key, label });
-
-const REPORTS: ReportDef[] = [
+const CORE_REPORTS: ReportDef[] = [
   {
     key: 'attendance-daily', group: 'Students', title: 'Daily attendance summary',
     description: 'Present, absent and late by class and campus', perms: ['attendance.read'],
+    filters: ['campus', 'date'],
+    summary: [
+      { key: 'present', label: 'Present', agg: 'sum', tone: 'teal' },
+      { key: 'late', label: 'Late', agg: 'sum', tone: 'amber' },
+      { key: 'absent', label: 'Absent', agg: 'sum', tone: 'critical' },
+      { key: 'students', label: 'On roll', agg: 'sum', tone: 'info' },
+    ],
+    chart: { mode: 'value', labelKey: 'grade', valueKey: 'present', label: 'Present by grade' },
     build: async (user, p) => {
       const w = scoped(user, p.campusId);
       const date = p.date ?? schoolToday();
@@ -287,6 +292,8 @@ const REPORTS: ReportDef[] = [
   {
     key: 'early-warning', group: 'Students', title: 'Early Warning review list',
     description: 'Open signals, interventions and owners', perms: ['earlywarning.read'],
+    filters: ['campus'],
+    chart: { mode: 'count', labelKey: 'risk', label: 'Open signals by risk' },
     build: async (user, p) => {
       const w = new Where().add('s.deleted_at IS NULL').add('e.closed_at IS NULL');
       studentScope(user, w);
@@ -310,6 +317,12 @@ const REPORTS: ReportDef[] = [
   {
     key: 'student-progress', group: 'Students', title: 'Student progress report',
     description: 'Academic trend, attendance and participation per student', perms: ['students.read', 'students.read_assigned'],
+    filters: ['campus'],
+    summary: [
+      { key: 'attendance', label: 'Mean attendance', agg: 'avg', unit: '%', tone: 'teal' },
+      { key: 'average', label: 'Mean latest average', agg: 'avg', unit: '%', tone: 'info' },
+    ],
+    chart: { mode: 'count', labelKey: 'risk', label: 'Students by risk band' },
     build: async (user, p) => {
       const w = scoped(user, p.campusId);
       const rows = await many(
@@ -327,6 +340,12 @@ const REPORTS: ReportDef[] = [
   {
     key: 'portfolio-completeness', group: 'Students', title: 'Portfolio completeness',
     description: 'Evidence coverage by grade', perms: ['students.read', 'students.read_assigned'],
+    filters: ['campus'],
+    summary: [
+      { key: 'students', label: 'Students', agg: 'sum', tone: 'info' },
+      { key: 'complete', label: 'Mean completeness', agg: 'avg', unit: '%', tone: 'teal' },
+    ],
+    chart: { mode: 'value', labelKey: 'label', valueKey: 'complete', label: 'Complete % by grade' },
     build: async (user, p) => {
       const { portfolioOverview } = await import('./intelligence-students.service.js');
       const o = await portfolioOverview(user, p.campusId);
@@ -340,6 +359,13 @@ const REPORTS: ReportDef[] = [
   {
     key: 'assessment-results', group: 'Academics', title: 'Assessment results pack',
     description: 'Results per assessment with averages and completion', perms: ['academics.read'],
+    filters: ['campus'],
+    summary: [
+      { key: 'entered', label: 'Marks entered', agg: 'sum', tone: 'info' },
+      { key: 'absent', label: 'Absent', agg: 'sum', tone: 'amber' },
+      { key: 'averagePct', label: 'Mean average', agg: 'avg', unit: '%', tone: 'teal' },
+    ],
+    chart: { mode: 'count', labelKey: 'subject', label: 'Assessments by subject' },
     build: async (user, p) => {
       const w = new Where().add('a.academic_year_id = (SELECT id FROM academic_years WHERE is_current)');
       w.addIf(p.campusId, 'c.campus_id = ?');
@@ -364,6 +390,12 @@ const REPORTS: ReportDef[] = [
   {
     key: 'curriculum-coverage', group: 'Academics', title: 'Curriculum coverage',
     description: 'Objectives taught against objectives planned', perms: ['academics.read'],
+    filters: ['campus'],
+    summary: [
+      { key: 'coverage', label: 'Mean coverage', agg: 'avg', unit: '%', tone: 'teal' },
+      { key: 'mastery', label: 'Mean mastery', agg: 'avg', unit: '%', tone: 'info' },
+    ],
+    chart: { mode: 'count', labelKey: 'subject', label: 'Objectives by subject' },
     build: async () => ({
       columns: [col('code', 'Objective'), col('subject', 'Subject'), col('stage', 'Stage'), col('description', 'Description'), col('coverage', 'Coverage %'), col('mastery', 'Mastery %')],
       rows: await many(`SELECT o.code, sub.name AS subject, o.stage_label AS stage, o.description, o.coverage_pct AS coverage, o.mastery_pct AS mastery
@@ -373,6 +405,8 @@ const REPORTS: ReportDef[] = [
   {
     key: 'report-card-status', group: 'Academics', title: 'Report card status',
     description: 'Where every class sits in the release workflow', perms: ['academics.read'],
+    filters: ['campus'],
+    chart: { mode: 'count', labelKey: 'stageLabel', label: 'Classes by stage' },
     build: async (_user, p) => {
       const stages = ['Marks entry', 'Moderation', 'AI draft comments', 'Teacher review', 'Approval', 'Parent release'];
       const rows = await many(
@@ -392,6 +426,9 @@ const REPORTS: ReportDef[] = [
   {
     key: 'admissions-funnel', group: 'Operations', title: 'Admissions funnel report',
     description: 'Stage movement, source mix and cost per admission', perms: ['admissions.read'],
+    filters: ['campus'],
+    summary: [{ key: 'enquiries', label: 'Enquiries', agg: 'sum', tone: 'info' }],
+    chart: { mode: 'value', labelKey: 'source', valueKey: 'enquiries', label: 'Enquiries by source' },
     build: async (_user, p) => ({
       columns: [col('source', 'Source'), col('enquiries', 'Enquiries'), col('qualified', 'Qualified or later'), col('visits', 'Visited or later'),
         col('applications', 'Applications or later'), col('enrolled', 'Enrolled'), col('lost', 'Lost'), col('spend', 'Spend (INR)'), col('costPerAdmission', 'Cost per admission (INR)')],
@@ -411,6 +448,13 @@ const REPORTS: ReportDef[] = [
   {
     key: 'fee-collection', group: 'Operations', title: 'Fee collection and ageing',
     description: 'Collection, outstanding and overdue by head', perms: ['finance.read'],
+    filters: ['campus'],
+    summary: [
+      { key: 'billed', label: 'Billed', agg: 'sum', unit: 'INR', tone: 'info' },
+      { key: 'collected', label: 'Collected', agg: 'sum', unit: 'INR', tone: 'teal' },
+      { key: 'outstanding', label: 'Outstanding', agg: 'sum', unit: 'INR', tone: 'critical' },
+    ],
+    chart: { mode: 'value', labelKey: 'head', valueKey: 'outstanding', label: 'Outstanding by fee head' },
     build: async (_user, p) => ({
       columns: [col('head', 'Fee head'), col('billed', 'Billed (INR)'), col('collected', 'Collected (INR)'), col('outstanding', 'Outstanding (INR)'),
         col('overdue', 'Overdue (INR)'), col('overdue30', 'Overdue > 30 days (INR)'), col('accounts', 'Students'), col('collectionPct', 'Collection %')],
@@ -430,6 +474,13 @@ const REPORTS: ReportDef[] = [
   {
     key: 'payroll-cost', group: 'Operations', title: 'Payroll cost report',
     description: 'Gross, deductions and net by employee category', perms: ['payroll.read'],
+    filters: ['campus'],
+    summary: [
+      { key: 'employees', label: 'Payslips', agg: 'sum', tone: 'info' },
+      { key: 'gross', label: 'Gross', agg: 'sum', unit: 'INR', tone: 'info' },
+      { key: 'net', label: 'Net paid', agg: 'sum', unit: 'INR', tone: 'teal' },
+    ],
+    chart: { mode: 'value', labelKey: 'category', valueKey: 'net', label: 'Net pay by category' },
     build: async (_user, p) => ({
       columns: [col('month', 'Pay month'), col('status', 'Run status'), col('category', 'Category'), col('employees', 'Employees'),
         col('gross', 'Gross (INR)'), col('deductions', 'Deductions (INR)'), col('net', 'Net (INR)')],
@@ -444,6 +495,9 @@ const REPORTS: ReportDef[] = [
   {
     key: 'compliance-status', group: 'Operations', title: 'Compliance status',
     description: 'Every requirement, owner and due date', perms: ['operations.read'],
+    filters: ['campus'],
+    summary: [{ key: 'status', label: 'Overdue', agg: 'count', equals: 'Overdue', tone: 'critical' }],
+    chart: { mode: 'count', labelKey: 'status', label: 'Requirements by status' },
     build: async (_user, p) => ({
       columns: [col('campus', 'Campus'), col('item', 'Requirement'), col('authority', 'Authority'), col('owner', 'Owner'), col('due', 'Due'),
         col('status', 'Status'), col('completed', 'Completed on')],
@@ -458,6 +512,8 @@ const REPORTS: ReportDef[] = [
   {
     key: 'safety-log', group: 'Operations', title: 'Safety and incident log',
     description: 'Transport, health, facilities and safeguarding incidents', perms: ['safety.read'],
+    filters: ['campus', 'range'],
+    chart: { mode: 'count', labelKey: 'severity', label: 'Incidents by severity' },
     build: async (user, p) => ({
       columns: [col('code', 'Incident'), col('date', 'Date'), col('campus', 'Campus'), col('type', 'Type'), col('severity', 'Severity'),
         col('status', 'Status'), col('summary', 'Summary'), col('owner', 'Owner')],
@@ -474,6 +530,8 @@ const REPORTS: ReportDef[] = [
   {
     key: 'daily-brief', group: 'Management', title: 'Daily brief',
     description: 'The end-of-day summary the Principal receives', perms: ['dashboard.view'], alsoRequires: ['students.read'],
+    filters: ['campus'],
+    chart: { mode: 'count', labelKey: 'area', label: 'Measures by area' },
     build: async (user, p) => {
       const { commandCenter } = await import('./dashboard.service.js');
       const d: any = await commandCenter(user, p.campusId ?? null);
@@ -497,6 +555,12 @@ const REPORTS: ReportDef[] = [
   {
     key: 'campus-comparison', group: 'Management', title: 'Campus comparison',
     description: 'Every measure, campus by campus', perms: ['group.read'],
+    summary: [
+      { key: 'students', label: 'Students', agg: 'sum', tone: 'info' },
+      { key: 'atRisk', label: 'At Risk', agg: 'sum', tone: 'critical' },
+      { key: 'staff', label: 'Active staff', agg: 'sum', tone: 'info' },
+    ],
+    chart: { mode: 'value', labelKey: 'campus', valueKey: 'students', label: 'Students by campus' },
     build: async () => ({
       columns: [col('campus', 'Campus'), col('students', 'Students'), col('attendancePct', 'Attendance % (30 days)'), col('average', 'Latest average'),
         col('atRisk', 'At Risk'), col('openSignals', 'Open signals'), col('staff', 'Active staff')],
@@ -516,21 +580,41 @@ const REPORTS: ReportDef[] = [
   },
 ];
 
-const canRun = (u: AuthUser, r: ReportDef) => r.perms.some((p) => has(u, p)) && (r.alsoRequires ?? []).every((p) => has(u, p));
+/** Every standard report: the teaching-domain set plus the Super Admin platform set. */
+export const REPORTS: ReportDef[] = [...CORE_REPORTS, ...SYSTEM_REPORTS];
+
+const canRun = (u: AuthUser, r: ReportDef) =>
+  (!r.roles || r.roles.includes(u.roleKey))
+  && r.perms.some((p) => has(u, p))
+  && (r.alsoRequires ?? []).every((p) => has(u, p));
 
 export function reportCatalog(user: AuthUser) {
-  return REPORTS.map((r) => ({
+  // Role-restricted reports are hidden outright rather than shown as locked — a
+  // School Admin has no way to obtain them, so listing them would only mislead.
+  return REPORTS.filter((r) => !r.roles || r.roles.includes(user.roleKey)).map((r) => ({
     key: r.key, group: r.group, title: r.title, description: r.description,
     available: canRun(user, r),
     requires: r.perms,
     alsoRequires: r.alsoRequires ?? [],
+    filters: r.filters ?? ['campus'],
+    restricted: Boolean(r.roles),
   }));
 }
 
-export async function buildReport(user: AuthUser, key: string, params: ReportParams) {
+/** Resolves a report the caller is allowed to run, or throws 404 / 403. */
+export function reportFor(user: AuthUser, key: string): ReportDef {
   const def = REPORTS.find((r) => r.key === key);
-  if (!def) throw notFound('Report not found', 'REPORT_NOT_FOUND');
-  if (!canRun(user, def)) throw forbidden(`This report needs one of: ${def.perms.join(', ')}${def.alsoRequires?.length ? ` and ${def.alsoRequires.join(', ')}` : ''}`);
+  // An unauthorised role-restricted report reads as missing, so the catalogue and
+  // a direct request tell the same story.
+  if (!def || (def.roles && !def.roles.includes(user.roleKey))) throw notFound('Report not found', 'REPORT_NOT_FOUND');
+  if (!canRun(user, def)) {
+    throw forbidden(`This report needs one of: ${def.perms.join(', ')}${def.alsoRequires?.length ? ` and ${def.alsoRequires.join(', ')}` : ''}`);
+  }
+  return def;
+}
+
+export async function buildReport(user: AuthUser, key: string, params: ReportParams) {
+  const def = reportFor(user, key);
   const out = await def.build(user, params);
   return { ...out, title: def.title, filename: `${def.key}-${params.date ?? schoolToday()}.csv` };
 }

@@ -188,6 +188,7 @@ export const NAV: NavGroup[] = [
   },
   {
     group: 'Administration', icon: 'settings', items: [
+      { label: 'Report Centre', icon: 'barChart', to: '/admin/reports', perm: ['users.manage'] },
       { label: 'Users & Roles', icon: 'users', to: '/admin/users', perm: ['users.manage'] },
       { label: 'System Settings', icon: 'settings', to: '/admin/settings', perm: ['settings.manage'] },
     ],

@@ -171,3 +171,12 @@ export const reportExportQuery = z.object({
   from: isoDate.optional(),
   to: isoDate.optional(),
 });
+
+/** Report Centre preview: the export filters plus on-screen paging, sorting and search. */
+export const reportPreviewQuery = reportExportQuery.extend({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(25),
+  sort: z.string().max(60).optional(),
+  dir: z.enum(['asc', 'desc']).default('asc'),
+  q: z.string().trim().max(100).optional(),
+});
